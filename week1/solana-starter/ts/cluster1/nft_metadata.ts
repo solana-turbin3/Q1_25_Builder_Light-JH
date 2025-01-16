@@ -1,6 +1,6 @@
-import wallet from "../wba-wallet.json"
+import wallet from "../../../../devnet.json"
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults"
-import { createGenericFile, createSignerFromKeypair, signerIdentity } from "@metaplex-foundation/umi"
+import { createSignerFromKeypair, signerIdentity } from "@metaplex-foundation/umi"
 import { irysUploader } from "@metaplex-foundation/umi-uploader-irys"
 
 // Create a devnet connection
@@ -14,32 +14,29 @@ umi.use(signerIdentity(signer));
 
 (async () => {
     try {
-        // Follow this JSON structure
-        // https://docs.metaplex.com/programs/token-metadata/changelog/v1.0#json-structure
-
-        // const image = ???
-        // const metadata = {
-        //     name: "?",
-        //     symbol: "?",
-        //     description: "?",
-        //     image: "?",
-        //     attributes: [
-        //         {trait_type: '?', value: '?'}
-        //     ],
-        //     properties: {
-        //         files: [
-        //             {
-        //                 type: "image/png",
-        //                 uri: "?"
-        //             },
-        //         ]
-        //     },
-        //     creators: []
-        // };
-        // const myUri = ???
-        // console.log("Your metadata URI: ", myUri);
+        const image = "https://devnet.irys.xyz/E6k4i8xvS5pKxsWpZMnk7LbQKsENgSVqH8SjVtM3eQNw";
+        const metadata = {
+            name: "rainbowRug",
+            symbol: "RRUG",
+            description: "Rug generated from code",
+            image,
+            attributes: [
+                { trait_type: "material", value: "wool" }
+            ],
+            properties: {
+                files: [
+                    {
+                        type: "image/png",
+                        uri: image
+                    },
+                ]
+            },
+            creators: []
+        };
+        const myUri = await umi.uploader.uploadJson(metadata)
+        console.log("Your metadata URI: ", myUri);
     }
-    catch(error) {
+    catch (error) {
         console.log("Oops.. Something went wrong", error);
     }
 })();

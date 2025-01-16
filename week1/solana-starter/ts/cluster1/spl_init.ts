@@ -9,10 +9,8 @@ const keypair = Keypair.fromSecretKey(new Uint8Array(wallet));
 const commitment: Commitment = "confirmed";
 const connection = new Connection("https://api.devnet.solana.com", commitment);
 
-
 (async () => {
     try {
-        //7rpjuQQRGYeC4SDuDTcMMTwd7r7jQuUpdPNUnVeAbLkp
         const mint = await createMint(connection, keypair, keypair.publicKey, keypair.publicKey,
             2, undefined, {}, TOKEN_PROGRAM_ID);
         console.log(`mint account: ${mint}`)
@@ -20,3 +18,5 @@ const connection = new Connection("https://api.devnet.solana.com", commitment);
         console.log(`Oops, something went wrong: ${error}`)
     }
 })()
+
+//GeLTUdsxUcUkkVRkWj4UmKw4ShsR1MHh4ZuKrbC5a9au
