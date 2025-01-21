@@ -1,5 +1,4 @@
 use anchor_lang::{
-    accounts::signer,
     prelude::*,
     system_program::{transfer, Transfer},
 };
@@ -47,7 +46,7 @@ impl<'info> Initialize<'info> {
 }
 
 #[derive(Accounts)]
-pub struct deposit<'info> {
+pub struct Deposit<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
     #[account(
@@ -62,4 +61,92 @@ pub struct deposit<'info> {
     )]
     pub vault: SystemAccount<'info>,
     pub system_program: Program<'info, System>,
+}
+
+impl<'info> Deposit<'info> {
+    pub fn deposit(&mut self, amount: u64) -> Result<()> {
+        let cpi_program = self.system_program.to_account_info();
+        let cpi_accounts = Transfer {
+            from: self.signer.to_account_info(),
+            to: self.vault.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        transfer(cpi_ctx, amount)
+    }
+}
+
+#[derive(Accounts)]
+pub struct Withdraw<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(
+        seeds = [b"state",signer.key().as_ref()],
+        bump = vault_state.state_bump
+    )]
+    pub vault_state: Account<'info, VaultState>,
+    #[account(
+        mut,
+        seeds = [b"state",signer.key().as_ref()],
+        bump = vault_state.vault_bump
+    )]
+    pub vault: SystemAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+impl<'info> Withdraw<'info> {
+    pub fn withdraw(&mut self, amount: u64) -> Result<()> {
+        let cpi_program = self.system_program.to_account_info();
+        let cpi_accounts = Transfer {
+            from: self.vault.to_account_info(),
+            to: self.signer.to_account_info(),
+        };
+
+        let binding = self.vault_state.to_account_info().key();
+        let signer_seeds: [&[&[u8]]; 1] = [&[
+            b"state".as_ref(),
+            binding.as_ref(),
+            &[self.vault_state.vault_bump],
+        ]];
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, &signer_seeds);
+        transfer(cpi_ctx, amount)?;
+        Ok(())
+    }
+}
+#[derive(Accounts)]
+pub struct Cancel<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(
+        mut,
+        close = signer,
+        seeds = [b"state",signer.key().as_ref()],
+        bump = vault_state.state_bump
+    )]
+    pub vault_state: Account<'info, VaultState>,
+    #[account(
+        mut,
+        seeds = [b"state",signer.key().as_ref()],
+        bump = vault_state.vault_bump
+    )]
+    pub vault: SystemAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+impl<'info> Cancel<'info> {
+    pub fn cancel(&mut self) -> Result<()> {
+        let cpi_program = self.system_program.to_account_info();
+        let cpi_accounts = Transfer {
+            from: self.vault.to_account_info(),
+            to: self.signer.to_account_info(),
+        };
+        let binding = self.vault_state.to_account_info().key();
+        let signer_seeds: [&[&[u8]]; 1] = [&[
+            b"state".as_ref(),
+            binding.as_ref(),
+            &[self.vault_state.vault_bump],
+        ]];
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, &signer_seeds);
+        transfer(cpi_ctx, self.vault.lamports());
+        Ok(())
+    }
 }
