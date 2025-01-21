@@ -13,6 +13,18 @@ pub mod escrow {
         ctx.accounts.initialize(&ctx.bumps);
         Ok(())
     }
+    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+        ctx.accounts.deposit(amount)?;
+        Ok(())
+    }
+    pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
+        ctx.accounts.withdraw(amount)?;
+        Ok(())
+    }
+    pub fn cancel(ctx: Context<Cancel>) -> Result<()> {
+        ctx.accounts.cancel();
+        Ok(())
+    }
 }
 #[account]
 #[derive(InitSpace)]
@@ -146,7 +158,7 @@ impl<'info> Cancel<'info> {
             &[self.vault_state.vault_bump],
         ]];
         let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, &signer_seeds);
-        transfer(cpi_ctx, self.vault.lamports());
+        transfer(cpi_ctx, self.vault.lamports())?;
         Ok(())
     }
 }
