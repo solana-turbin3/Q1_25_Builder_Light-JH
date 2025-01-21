@@ -19,4 +19,3 @@ const connection = new Connection("https://api.devnet.solana.com", commitment);
     }
 })()
 
-//GeLTUdsxUcUkkVRkWj4UmKw4ShsR1MHh4ZuKrbC5a9au

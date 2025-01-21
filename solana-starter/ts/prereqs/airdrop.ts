@@ -10,9 +10,9 @@ const connection = new Connection("https://api.devnet.solana.com");
 (async () => {
     try {
         const txhash = await connection.requestAirdrop(keypair.publicKey, 2 * LAMPORTS_PER_SOL);
-    console.log(`Success! Check out your TX here: 
+        console.log(`Success! Check out your TX here:
     https://explorer.solana.com/tx/${txhash}?cluster=devnet`);
-    } catch(e) {
+    } catch (e) {
         console.error(`Oops, something went wrong: ${e}`)
     }
 })();
