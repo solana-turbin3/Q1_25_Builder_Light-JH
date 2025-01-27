@@ -3,6 +3,9 @@ use anchor_lang::{
     system_program::{transfer, Transfer},
 };
 
+pub mod instructions;
+pub mod state;
+
 declare_id!("EBTW9hWHnBqmy3guGE23fBR62CZYwEigTkCjLWmaT9kK");
 
 #[program]
@@ -22,7 +25,7 @@ pub mod escrow {
         Ok(())
     }
     pub fn cancel(ctx: Context<Cancel>) -> Result<()> {
-        ctx.accounts.cancel();
+        ctx.accounts.cancel()?;
         Ok(())
     }
 }
@@ -45,6 +48,7 @@ pub struct Initialize<'info> {
         bump
     )]
     pub vault_state: Account<'info, VaultState>,
+    // cannot call init on a SystemAccount, and remove payer
     #[account(seeds = [b"vault", vault_state.key().as_ref()], bump)]
     pub vault: SystemAccount<'info>,
     pub system_program: Program<'info, System>,
