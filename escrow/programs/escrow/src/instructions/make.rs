@@ -12,8 +12,11 @@ pub struct Make<'info> {
     #[account(mut)]
     pub maker: Signer<'info>,
     #[account(
-        mint::token_program = token_program
+        mint::token_program = token_program //ensures mint_a is a valid token mint by checking the constraints
     )]
+    //mint_a is an existing SPL token mint and is only being referenced
+    //Because it's externally created, its private key exists (controlled by whoever initialized it).
+    //The program does not own or control mint_a.
     pub mint_a: InterfaceAccount<'info, Mint>,
     #[account(
         mint::token_program = token_program

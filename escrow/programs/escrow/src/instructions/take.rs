@@ -101,7 +101,7 @@ impl<'info> Take<'info> {
             tranfer_accounts,
             &signer_seeds,
         );
-        transfer_checked(cpi_ctx, self.vault.amount, self.mint_a.decimals);
+        transfer_checked(cpi_ctx, self.vault.amount, self.mint_a.decimals)?;
 
         let accounts = CloseAccount {
             account: self.vault.to_account_info(),
