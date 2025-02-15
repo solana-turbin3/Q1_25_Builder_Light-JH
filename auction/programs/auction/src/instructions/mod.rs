@@ -9,3 +9,6 @@ pub use bid::*;
 
 pub mod withdraw;
 pub use withdraw::*;
+
+pub mod finalize;
+pub use finalize::*;

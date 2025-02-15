@@ -8,4 +8,6 @@ pub enum AuctionError {
     ArithematicOverflow,
     #[msg("PriceTooLow")]
     PriceTooLow,
+    #[msg("NotEligibleToWithdraw")]
+    NotEligibleToWithdraw,
 }

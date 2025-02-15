@@ -1,0 +1,154 @@
+use crate::errors::AuctionError;
+use crate::state::{Auction, AuctionHouse, BidState};
+use anchor_lang::prelude::*;
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token::{close_account, CloseAccount},
+    token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
+};
+
+#[derive(Accounts)]
+pub struct Finalize<'info> {
+    #[account(mut)]
+    pub seller: Signer<'info>,
+    pub bidder: Signer<'info>,
+    pub mint_a: InterfaceAccount<'info, Mint>,
+    pub mint_b: InterfaceAccount<'info, Mint>,
+    // pub mint_b: InterfaceAccount<'info, Mint>,// can get from auction.mint_b
+    #[account(
+        seeds = [b"house", auction_house.name.as_str().as_bytes()],
+        bump = auction_house.bump,
+    )]
+    pub auction_house: Account<'info, AuctionHouse>,
+    #[account(
+        mut,
+        close = seller,
+        seeds = [b"auction", auction_house.key().as_ref(), seller.key().as_ref(), mint_a.key().as_ref(), mint_b.key().as_ref(), auction.end.to_le_bytes().as_ref()],
+        bump = auction.bump,
+    )]
+    pub auction: Account<'info, Auction>,
+    #[account(
+        init_if_needed,
+        payer = seller,
+        associated_token::mint = mint_a,
+        associated_token::authority = bidder,
+    )]
+    pub bidder_mint_a_ata: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        init_if_needed,
+        payer = seller,
+        associated_token::mint = mint_b,
+        associated_token::authority = seller,
+    )]
+    pub seller_mint_b_ata: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        mut,
+        associated_token::mint = mint_b,
+        associated_token::authority = bid_state,
+    )]
+    pub bidder_escrow: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        mut,
+        close = bidder,
+        seeds = [b"bid", auction.key().as_ref(), bidder.key().as_ref()],
+        bump = bid_state.bump,
+    )]
+    pub bid_state: Account<'info, BidState>,
+    #[account(
+        associated_token::mint = auction.mint_a,
+        associated_token::authority = auction,
+    )]
+    pub vault: InterfaceAccount<'info, TokenAccount>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub system_program: Program<'info, System>,
+}
+
+impl<'info> Finalize<'info> {
+    pub fn winner_withdraw_and_close_auction(&mut self) -> Result<()> {
+        let current_slot = Clock::get()?.slot;
+        require!(
+            (self.bid_state.bidder == self.auction.bidder && current_slot >= self.auction.end),
+            AuctionError::NotEligibleToWithdraw
+        );
+
+        let seeds = &[
+            b"bid",
+            self.auction.to_account_info().key.as_ref(),
+            self.auction.bidder.as_ref(),
+            &[self.bid_state.bump],
+        ];
+        let signer_seeds = &[&seeds[..]];
+
+        let transfer_accounts = TransferChecked {
+            from: self.vault.to_account_info(),
+            to: self.bidder_mint_a_ata.to_account_info(),
+            mint: self.mint_a.to_account_info(),
+            authority: self.vault.to_account_info(),
+        };
+
+        let cpi_ctx = CpiContext::new_with_signer(
+            self.token_program.to_account_info(),
+            transfer_accounts,
+            signer_seeds,
+        );
+
+        transfer_checked(cpi_ctx, self.bidder_escrow.amount, self.mint_b.decimals)?;
+
+        // close vault to refund rent exemption
+        let accounts = CloseAccount {
+            account: self.vault.to_account_info(),
+            destination: self.seller.to_account_info(),
+            authority: self.auction.to_account_info(),
+        };
+
+        let ctx = CpiContext::new_with_signer(
+            self.token_program.to_account_info(),
+            accounts,
+            signer_seeds,
+        );
+
+        close_account(ctx);
+        Ok(())
+    }
+
+    pub fn seller_withdraw_and_close_escrow(&mut self) -> Result<()> {
+        let seeds = &[
+            b"bid",
+            self.auction.to_account_info().key.as_ref(),
+            self.bidder.to_account_info().key.as_ref(),
+            &[self.bid_state.bump],
+        ];
+        let signer_seeds = &[&seeds[..]];
+
+        let transfer_accounts = TransferChecked {
+            from: self.bidder_escrow.to_account_info(),
+            to: self.seller_mint_b_ata.to_account_info(),
+            mint: self.mint_b.to_account_info(),
+            authority: self.auction.to_account_info(),
+        };
+
+        let cpi_ctx = CpiContext::new_with_signer(
+            self.token_program.to_account_info(),
+            transfer_accounts,
+            signer_seeds,
+        );
+
+        transfer_checked(cpi_ctx, self.bidder_escrow.amount, self.mint_b.decimals)?;
+
+        let accounts = CloseAccount {
+            account: self.bidder_escrow.to_account_info(),
+            destination: self.bidder.to_account_info(),
+            authority: self.bid_state.to_account_info(),
+        };
+
+        let ctx = CpiContext::new_with_signer(
+            self.token_program.to_account_info(),
+            accounts,
+            signer_seeds,
+        );
+
+        close_account(ctx);
+        Ok(())
+    }
+}
