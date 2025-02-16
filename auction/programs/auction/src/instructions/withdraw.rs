@@ -17,7 +17,7 @@ pub struct Withdraw<'info> {
         bump = auction_house.bump,
     )]
     pub auction_house: Account<'info, AuctionHouse>,
-    // This is unchecked, because the account may or may not exist at this point.
+    /// CHECK: This is unchecked, because the account may or may not exist at this point.
     pub auction: AccountInfo<'info>,
     #[account(
         associated_token::mint = mint_b,
