@@ -8,6 +8,7 @@ use anchor_spl::{
 };
 
 #[derive(Accounts)]
+#[instruction(price: u64, decimal: u8 )]
 pub struct Bid<'info> {
     #[account(mut)]
     pub bidder: Signer<'info>,
@@ -24,17 +25,11 @@ pub struct Bid<'info> {
     )]
     pub auction: Account<'info, Auction>,
     #[account(
+        mut,
         associated_token::mint = mint_b,
         associated_token::authority = bidder,
     )]
     pub bidder_mint_b_ata: InterfaceAccount<'info, TokenAccount>,
-    #[account(
-        init,
-        payer = bidder,
-        associated_token::mint = mint_b,
-        associated_token::authority = bid_state,
-    )]
-    pub bidder_escrow: InterfaceAccount<'info, TokenAccount>,
     #[account(
         init,
         payer = bidder,
@@ -44,6 +39,14 @@ pub struct Bid<'info> {
     )]
     pub bid_state: Account<'info, BidState>,
     #[account(
+        init,
+        payer = bidder,
+        associated_token::mint = mint_b,
+        associated_token::authority = bid_state,
+    )]
+    pub bidder_escrow: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        mut,
         associated_token::mint = auction.mint_a,
         associated_token::authority = auction,
     )]
@@ -73,7 +76,9 @@ impl<'info> Bid<'info> {
         Ok(())
     }
     pub fn deposit(&mut self) -> Result<()> {
-        let amount = self.vault.amount
+        let amount = self
+            .vault
+            .amount
             .checked_mul(self.auction.highest_price)
             .ok_or(AuctionError::ArithematicOverflow)?
             .checked_div(10u64.pow(u32::from(self.auction.decimal)))
@@ -85,7 +90,7 @@ impl<'info> Bid<'info> {
             from: self.bidder_mint_b_ata.to_account_info(),
             to: self.bidder_escrow.to_account_info(),
             mint: self.mint_b.to_account_info(),
-            authority: self.bid_state.to_account_info(),
+            authority: self.bidder.to_account_info(),
         };
 
         let cpi_ctx = CpiContext::new(cpi_program, transfer_accounts);

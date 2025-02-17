@@ -45,7 +45,7 @@ pub mod auction {
     }
 
     pub fn finalize(ctx: Context<Finalize>) -> Result<()> {
-        ctx.accounts.winner_withdraw_and_close_auction()?;
+        ctx.accounts.winner_withdraw_and_close_vault()?;
         ctx.accounts.seller_withdraw_and_close_escrow()?;
         Ok(())
     }

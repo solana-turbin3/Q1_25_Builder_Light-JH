@@ -29,6 +29,7 @@ pub struct InitAuction<'info> {
     pub mint_a: InterfaceAccount<'info, Mint>,
     pub mint_b: InterfaceAccount<'info, Mint>,
     #[account(
+        mut,
         associated_token::mint = mint_a,
         associated_token::authority = seller,
     )]

@@ -10,10 +10,11 @@ use anchor_spl::{
 #[derive(Accounts)]
 pub struct Finalize<'info> {
     #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut)]
     pub seller: SystemAccount<'info>,
     #[account(mut)]
     pub bidder: SystemAccount<'info>,
-    #[account(mut)]
     pub admin: SystemAccount<'info>,
     pub mint_a: InterfaceAccount<'info, Mint>,
     pub mint_b: InterfaceAccount<'info, Mint>,
@@ -32,26 +33,25 @@ pub struct Finalize<'info> {
     pub auction: Account<'info, Auction>,
     #[account(
         init_if_needed,
-        payer = seller,
+        payer = payer,
         associated_token::mint = mint_a,
         associated_token::authority = bidder,
     )]
     pub bidder_mint_a_ata: InterfaceAccount<'info, TokenAccount>,
     #[account(
         init_if_needed,
-        payer = seller,
+        payer = payer,
         associated_token::mint = mint_b,
         associated_token::authority = seller,
     )]
     pub seller_mint_b_ata: InterfaceAccount<'info, TokenAccount>,
     #[account(
         init_if_needed,
-        payer = seller,
+        payer = payer,
         associated_token::mint = mint_b,
         associated_token::authority = admin,
     )]
-
-    pub house_mint_b_ata:InterfaceAccount<'info, TokenAccount>,
+    pub house_mint_b_ata: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -67,6 +67,7 @@ pub struct Finalize<'info> {
     )]
     pub bid_state: Account<'info, BidState>,
     #[account(
+        mut,
         associated_token::mint = auction.mint_a,
         associated_token::authority = auction,
     )]
@@ -86,10 +87,13 @@ impl<'info> Finalize<'info> {
         );
 
         let seeds = &[
-            b"bid",
-            self.auction.to_account_info().key.as_ref(),
-            self.auction.bidder.as_ref(),
-            &[self.bid_state.bump],
+            b"auction",
+            self.auction_house.to_account_info().key.as_ref(),
+            self.seller.to_account_info().key.as_ref(),
+            self.mint_a.to_account_info().key.as_ref(),
+            self.mint_b.to_account_info().key.as_ref(),
+            &self.auction.end.to_le_bytes()[..],
+            &[self.auction.bump],
         ];
         let signer_seeds = &[&seeds[..]];
 
@@ -106,7 +110,8 @@ impl<'info> Finalize<'info> {
             signer_seeds,
         );
 
-        transfer_checked(cpi_ctx, self.bidder_escrow.amount, self.mint_b.decimals)?;
+        msg!("transfering to bidder ata a.");
+        transfer_checked(cpi_ctx, self.vault.amount, self.mint_a.decimals)?;
 
         // close vault to refund rent exemption
         let accounts = CloseAccount {
@@ -154,13 +159,21 @@ impl<'info> Finalize<'info> {
             signer_seeds,
         );
 
-        let houseFee = self.bidder_escrow.amount
-            .checked_mul(self.fee)
-            .ok_or(MarketplaceError::ArithematicOverflow)?
-            .checked_div(10000_u64)
-            .ok_or(MarketplaceError::ArithematicOverflow)?;
-        let amount = self.bidder_escrow.amount - houseFee;
+        let house_fee = self
+            .bidder_escrow
+            .amount
+            .checked_mul(u64::from(self.auction_house.fee))
+            .unwrap()
+            .checked_div(10_000)
+            .unwrap();
 
+        msg!(&format!(
+            "bidder escrow: {}. house_fee={}. vault={}.",
+            self.bidder_escrow.amount, house_fee, self.vault.amount,
+        ));
+        let amount = self.bidder_escrow.amount - house_fee;
+
+        msg!("transfering to bidder");
         transfer_checked(cpi_ctx, amount, self.mint_b.decimals)?;
 
         // transfer mintB from bidder_escrow to auction house
@@ -178,8 +191,8 @@ impl<'info> Finalize<'info> {
             signer_seeds,
         );
 
-        transfer_checked(cpi_ctx, houseFee, self.mint_b.decimals)?;
-
+        msg!("transfering to house");
+        transfer_checked(cpi_ctx, house_fee, self.mint_b.decimals)?;
 
         let accounts = CloseAccount {
             account: self.bidder_escrow.to_account_info(),
