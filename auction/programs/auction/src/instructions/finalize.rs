@@ -76,6 +76,7 @@ pub struct Finalize<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// there is a winner
 impl<'info> Finalize<'info> {
     pub fn winner_withdraw_and_close_vault(&mut self) -> Result<()> {
         let current_slot = Clock::get()?.slot;
