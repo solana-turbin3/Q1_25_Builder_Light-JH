@@ -73,20 +73,18 @@ impl<'info> Bid<'info> {
         Ok(())
     }
     pub fn deposit(&mut self) -> Result<()> {
-        let amount = self
-            .vault
-            .amount
+        let amount = self.vault.amount
             .checked_mul(self.auction.highest_price)
             .ok_or(AuctionError::ArithematicOverflow)?
             .checked_div(10u64.pow(u32::from(self.auction.decimal)))
             .ok_or(AuctionError::ArithematicOverflow)?;
 
         let cpi_program = self.token_program.to_account_info();
-
+        //example bid_price = 2B/A, amount = 50, 2*50 = 100B
         let transfer_accounts = TransferChecked {
             from: self.bidder_mint_b_ata.to_account_info(),
-            mint: self.mint_b.to_account_info(),
             to: self.bidder_escrow.to_account_info(),
+            mint: self.mint_b.to_account_info(),
             authority: self.bid_state.to_account_info(),
         };
 

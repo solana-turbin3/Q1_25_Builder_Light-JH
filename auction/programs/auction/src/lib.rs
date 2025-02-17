@@ -15,7 +15,7 @@ pub mod auction {
     use super::*;
 
     pub fn init_house(ctx: Context<InitHouse>, fee: u16, name: String) -> Result<()> {
-        ctx.accounts.init_house(fee, &ctx.bumps, name);
+        ctx.accounts.init_house(fee, &ctx.bumps, name)?;
         Ok(())
     }
 

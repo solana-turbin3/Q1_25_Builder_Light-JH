@@ -4,7 +4,7 @@ use crate::errors::AuctionError;
 use crate::state::AuctionHouse;
 
 #[derive(Accounts)]
-#[instruction(name: String)]
+#[instruction(_fee: u16, name: String)]
 pub struct InitHouse<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
@@ -24,7 +24,7 @@ pub struct InitHouse<'info> {
 impl<'info> InitHouse<'info> {
     pub fn init_house(&mut self, fee: u16, bumps: &InitHouseBumps, name: String) -> Result<()> {
         require!(
-            name.len() > 0 && name.len() < 4 + 33,
+            name.len() > 0 && name.len() < 32,
             AuctionError::NameTooLong
         );
 

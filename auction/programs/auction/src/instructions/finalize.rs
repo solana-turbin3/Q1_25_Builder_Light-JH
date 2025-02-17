@@ -10,8 +10,11 @@ use anchor_spl::{
 #[derive(Accounts)]
 pub struct Finalize<'info> {
     #[account(mut)]
-    pub seller: Signer<'info>,
-    pub bidder: Signer<'info>,
+    pub seller: SystemAccount<'info>,
+    #[account(mut)]
+    pub bidder: SystemAccount<'info>,
+    #[account(mut)]
+    pub admin: SystemAccount<'info>,
     pub mint_a: InterfaceAccount<'info, Mint>,
     pub mint_b: InterfaceAccount<'info, Mint>,
     // pub mint_b: InterfaceAccount<'info, Mint>,// can get from auction.mint_b
@@ -42,6 +45,15 @@ pub struct Finalize<'info> {
     )]
     pub seller_mint_b_ata: InterfaceAccount<'info, TokenAccount>,
     #[account(
+        init_if_needed,
+        payer = seller,
+        associated_token::mint = mint_b,
+        associated_token::authority = admin,
+    )]
+
+    pub house_mint_b_ata:InterfaceAccount<'info, TokenAccount>,
+
+    #[account(
         mut,
         associated_token::mint = mint_b,
         associated_token::authority = bid_state,
@@ -65,7 +77,7 @@ pub struct Finalize<'info> {
 }
 
 impl<'info> Finalize<'info> {
-    pub fn winner_withdraw_and_close_auction(&mut self) -> Result<()> {
+    pub fn winner_withdraw_and_close_vault(&mut self) -> Result<()> {
         let current_slot = Clock::get()?.slot;
         require!(
             (self.bid_state.bidder == self.auction.bidder && current_slot >= self.auction.end),
@@ -84,7 +96,7 @@ impl<'info> Finalize<'info> {
             from: self.vault.to_account_info(),
             to: self.bidder_mint_a_ata.to_account_info(),
             mint: self.mint_a.to_account_info(),
-            authority: self.vault.to_account_info(),
+            authority: self.auction.to_account_info(),
         };
 
         let cpi_ctx = CpiContext::new_with_signer(
@@ -108,11 +120,16 @@ impl<'info> Finalize<'info> {
             signer_seeds,
         );
 
-        close_account(ctx);
+        close_account(ctx)?;
         Ok(())
     }
 
     pub fn seller_withdraw_and_close_escrow(&mut self) -> Result<()> {
+        let current_slot = Clock::get()?.slot;
+        require!(
+            (current_slot >= self.auction.end),
+            AuctionError::NotEligibleToWithdraw
+        );
         let seeds = &[
             b"bid",
             self.auction.to_account_info().key.as_ref(),
@@ -121,11 +138,13 @@ impl<'info> Finalize<'info> {
         ];
         let signer_seeds = &[&seeds[..]];
 
+        // transfer mintB from bidder_escrow to seller
+
         let transfer_accounts = TransferChecked {
             from: self.bidder_escrow.to_account_info(),
             to: self.seller_mint_b_ata.to_account_info(),
             mint: self.mint_b.to_account_info(),
-            authority: self.auction.to_account_info(),
+            authority: self.bid_state.to_account_info(),
         };
 
         let cpi_ctx = CpiContext::new_with_signer(
@@ -134,7 +153,32 @@ impl<'info> Finalize<'info> {
             signer_seeds,
         );
 
-        transfer_checked(cpi_ctx, self.bidder_escrow.amount, self.mint_b.decimals)?;
+        let houseFee = self.bidder_escrow.amount
+            .checked_mul(self.fee)
+            .ok_or(MarketplaceError::ArithematicOverflow)?
+            .checked_div(10000_u64)
+            .ok_or(MarketplaceError::ArithematicOverflow)?;
+        let amount = self.bidder_escrow.amount - houseFee;
+
+        transfer_checked(cpi_ctx, amount, self.mint_b.decimals)?;
+
+        // transfer mintB from bidder_escrow to auction house
+
+        let transfer_accounts = TransferChecked {
+            from: self.bidder_escrow.to_account_info(),
+            to: self.house_mint_b_ata.to_account_info(),
+            mint: self.mint_b.to_account_info(),
+            authority: self.bid_state.to_account_info(),
+        };
+
+        let cpi_ctx = CpiContext::new_with_signer(
+            self.token_program.to_account_info(),
+            transfer_accounts,
+            signer_seeds,
+        );
+
+        transfer_checked(cpi_ctx, houseFee, self.mint_b.decimals)?;
+
 
         let accounts = CloseAccount {
             account: self.bidder_escrow.to_account_info(),
@@ -148,7 +192,7 @@ impl<'info> Finalize<'info> {
             signer_seeds,
         );
 
-        close_account(ctx);
+        close_account(ctx)?;
         Ok(())
     }
 }

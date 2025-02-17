@@ -1,113 +1,201 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Auction } from "../target/types/auction";
-import { publicKey } from "@coral-xyz/anchor/dist/cjs/utils";
-import { Keypair, LAMPORTS_PER_SOL, SystemProgram } from "@solana/web3.js";
+import { Keypair, LAMPORTS_PER_SOL, SystemProgram, PublicKey } from "@solana/web3.js";
 import { randomBytes } from 'crypto';
 
 import {
     TOKEN_PROGRAM_ID,
-    createMint,
-    createAccount,
-    mintTo,
-    getAccount,
-    ASSOCIATED_TOKEN_PROGRAM_ID,
-    getMint
+    getAssociatedTokenAddressSync,
+    getMinimumBalanceForRentExemptMint,
+    MINT_SIZE,
+    createInitializeMint2Instruction,
+    createAssociatedTokenAccountIdempotentInstruction,
+    createMintToInstruction
+
+
 } from "@solana/spl-token";
 import { assert } from "chai";
 
 describe("auction", () => {
+
     // Configure the client to use the local cluster.
-    let provider = anchor.AnchorProvider.env();
-    anchor.setProvider(provider);
+    let provider = anchor.getProvider();
+    anchor.setProvider(anchor.AnchorProvider.env());
 
     const program = anchor.workspace.Auction as Program<Auction>;
 
-    let mintA: anchor.web3.PublicKey;
-    let mintB: anchor.web3.PublicKey;
-    let sellerAtaA: anchor.web3.PublicKey;
-    let bidderAtaA: anchor.web3.PublicKey;
-    let sellerAtaB: anchor.web3.PublicKey;
-    let bidderAtaB: anchor.web3.PublicKey;
-    let auction: anchor.web3.PublicKey;
-    let vault: anchor.web3.PublicKey;
-    let bidder_escrow: anchor.web3.PublicKey;
-    let bid_state: anchor.web3.PublicKey;
-    let auction_house: anchor.web3.PublicKey;
-
-
+    const admin = Keypair.generate();
     const seller = Keypair.generate();
     const bidder = Keypair.generate();
-
-
+    const mintA = Keypair.generate();
+    const mintB = Keypair.generate();
+    const tokenProgram = TOKEN_PROGRAM_ID;
+    const sellerAtaA = getAssociatedTokenAddressSync(mintA.publicKey, seller.publicKey, true, tokenProgram);
+    const bidderAtaA = getAssociatedTokenAddressSync(mintA.publicKey, bidder.publicKey, true, tokenProgram);
+    const sellerAtaB = getAssociatedTokenAddressSync(mintB.publicKey, seller.publicKey, true, tokenProgram);
+    const bidderAtaB = getAssociatedTokenAddressSync(mintB.publicKey, bidder.publicKey, true, tokenProgram);
     const name = String("testAuction");
+    const [auction_house] = PublicKey.findProgramAddressSync(
+        [
+            Buffer.from("house"),
+            Buffer.from("testAuction"),
+        ],
+        program.programId,
+    );
+    let end: anchor.BN;
+    // let end = new anchor.BN(await provider.connection.getSlot() + 20);
+    // const [auction] = PublicKey.findProgramAddressSync(
+    //     [
+    //         Buffer.from("auction"),
+    //         auction_house.toBuffer(),
+    //         seller.publicKey.toBuffer(),
+    //         mintA.publicKey.toBuffer(),
+    //         mintB.publicKey.toBuffer(),
+    //         end.toArrayLike(Buffer, 'le', 8)
+    //     ],
+    //     program.programId,
+    // );
 
-    // anchor.BN() to represent numbers safely and precisely when interacting with solana programs
-    //Solana and many other blockchains use 64-bit or even 128-bit integers, which can exceed JavaScript's safe range.
-    const seed = new anchor.BN(randomBytes(8));
-    const depositAmount = new anchor.BN(50);
+    // const [bid_state] = PublicKey.findProgramAddressSync(
+    //     [
+    //         Buffer.from("bid"),
+    //         auction.toBuffer(),
+    //         bidder.publicKey.toBuffer(),
+    //     ],
+    //     program.programId,
+    // );
 
-    before(async () => {
-        const sellerAirdrop = await provider.connection.requestAirdrop(seller.publicKey, 10 * LAMPORTS_PER_SOL);
-        const bidderAirdrop = await provider.connection.requestAirdrop(bidder.publicKey, 10 * LAMPORTS_PER_SOL);
+    // const vault = getAssociatedTokenAddressSync(mintA.publicKey, auction, true, tokenProgram);
+    // const bidder_escrow = getAssociatedTokenAddressSync(mintB.publicKey, bid_state, true, tokenProgram);
+    // const seed = new anchor.BN(randomBytes(8));
 
-        const lastestBlockhash = await provider.connection.getLatestBlockhash();
-        await provider.connection.confirmTransaction({
-            signature: sellerAirdrop,
-            blockhash: lastestBlockhash.blockhash,
-            lastValidBlockHeight: lastestBlockhash.lastValidBlockHeight,
-        });
+    before("airdrop", async () => {
+        console.log("requesting airdrops");
+        let lamports = await getMinimumBalanceForRentExemptMint(program.provider.connection);
+        {
+            let tx = new anchor.web3.Transaction();
+            tx.instructions = [
+                SystemProgram.transfer({
+                    fromPubkey: provider.publicKey,
+                    toPubkey: seller.publicKey,
+                    lamports: 0.2 * LAMPORTS_PER_SOL,
 
+                }),
+                SystemProgram.transfer({
+                    fromPubkey: provider.publicKey,
+                    toPubkey: bidder.publicKey,
+                    lamports: 0.2 * LAMPORTS_PER_SOL,
 
-        await provider.connection.confirmTransaction({
-            signature: bidderAirdrop,
-            blockhash: lastestBlockhash.blockhash,
-            lastValidBlockHeight: lastestBlockhash.lastValidBlockHeight,
-        });
+                }),
+                SystemProgram.transfer({
+                    fromPubkey: provider.publicKey,
+                    toPubkey: admin.publicKey,
+                    lamports: 0.2 * LAMPORTS_PER_SOL,
 
-        mintA = await createMint(provider.connection, seller, seller.publicKey, null, 6);
-        mintB = await createMint(provider.connection, bidder, bidder.publicKey, null, 6);
+                }),
+                SystemProgram.createAccount({
+                    fromPubkey: provider.publicKey,
+                    newAccountPubkey: mintA.publicKey,
+                    lamports,
+                    space: MINT_SIZE,
+                    programId: tokenProgram,
 
-        sellerAtaA = await createAccount(provider.connection, seller, mintA, seller.publicKey);
-        bidderAtaA = await createAccount(provider.connection, bidder, mintA, bidder.publicKey);
-        sellerAtaB = await createAccount(provider.connection, seller, mintB, seller.publicKey);
-        bidderAtaB = await createAccount(provider.connection, bidder, mintB, bidder.publicKey);
+                }),
+                SystemProgram.createAccount({
+                    fromPubkey: provider.publicKey,
+                    newAccountPubkey: mintB.publicKey,
+                    lamports,
+                    space: MINT_SIZE,
+                    programId: tokenProgram,
 
-        await mintTo(provider.connection, seller, mintA, sellerAtaA, seller, 100000000);
-        await mintTo(provider.connection, bidder, mintB, bidderAtaB, bidder, 100000000);
+                })
+            ];
+            console.log("airdropping for: ", {
+                seller: seller.publicKey.toString(),
+                bidder: bidder.publicKey.toString(),
+                mintA: mintA.publicKey.toString(),
+                mintB: mintB.publicKey.toString(),
+            });
+            await provider.sendAndConfirm(tx, [mintA, mintB]);
+        }
 
-        [auction] = anchor.web3.PublicKey.findProgramAddressSync(
-            [Buffer.from("auction"), auction_house.toBuffer(), seller.publicKey.toBuffer(), mintA.toBuffer(), mintB.toBuffer(), end.toBuffer('le', 8)],
-            program.programId,
-        );
+        {
+            let tx = new anchor.web3.Transaction();
+            tx.instructions = [
+                createInitializeMint2Instruction(mintA.publicKey, 6, seller.publicKey, null, tokenProgram),
+                createAssociatedTokenAccountIdempotentInstruction(
+                    provider.publicKey, sellerAtaA, seller.publicKey, mintA.publicKey, tokenProgram
+                ),
+                createMintToInstruction(mintA.publicKey, sellerAtaA, seller.publicKey, 1e9, undefined, tokenProgram)
+            ];
+            console.log("creating mintA, minting seller ATA: ", {
+                seller: seller.publicKey.toString(),
+                mintA: mintA.publicKey.toString(),
+                sellerAtaA: sellerAtaA.toString(),
+            });
+            await provider.sendAndConfirm(tx, [seller]);
+        }
+        {
+            let tx = new anchor.web3.Transaction();
+            tx.instructions = [
+                createInitializeMint2Instruction(mintB.publicKey, 6, bidder.publicKey, null, tokenProgram),
+                createAssociatedTokenAccountIdempotentInstruction(
+                    provider.publicKey, bidderAtaB, bidder.publicKey, mintB.publicKey, tokenProgram
+                ),
+                createMintToInstruction(mintB.publicKey, bidderAtaB, bidder.publicKey, 1e9, undefined, tokenProgram),
+            ]
+            console.log("creating mintB, minting bidder ATA: ", {
+                bidder: bidder.publicKey.toString(),
+                mintB: mintB.publicKey.toString(),
+                bidderAtaB: bidderAtaB.toString()
+            });
+            await provider.sendAndConfirm(tx, [bidder]);
+        }
+        const connection = program.provider.connection;
 
-        [auction_house] = anchor.web3.PublicKey.findProgramAddressSync(
-            [Buffer.from("house"), Buffer.from(name)],
-            program.programId,
-        );
+        const mintAInfo = await connection.getAccountInfo(mintA.publicKey);
+        console.log("MintA Account Info:", mintAInfo);
 
-        [bid_state] = anchor.web3.PublicKey.findProgramAddressSync(
-            [Buffer.from("auction"), auction.toBuffer(), bidder.publicKey.toBuffer()],
-            program.programId,
-        );
+        const mintBInfo = await connection.getAccountInfo(mintA.publicKey);
+        console.log("MintB Account Info:", mintAInfo);
 
+        // Ensure the mints are initalized
+        if (!mintAInfo || !mintBInfo) {
+            throw new Error("Mint accounts are not initialized.")
+        }
 
-        vault = await anchor.utils.token.associatedAddress({
-            mint: mintA,
-            owner: auction
-        });
-        bidder_escrow = await anchor.utils.token.associatedAddress({
-            mint: mintB,
-            owner: bid_state,
-        })
+        const sellerAtaABalance = await connection.getTokenAccountBalance(sellerAtaA);
+        console.log("Seller ATA A Balance:", sellerAtaABalance);
 
-        let end = await provider.connection.getSlot() + 20;
+        // Ensure the correct amount of tokens was minted
+        if (sellerAtaABalance.value.amount !== "1000000000") {
+            throw new Error("Incorrect token balance in maker's ATA for mintA.");
+        }
 
     })
 
     it("initialize house", async () => {
-        // Add your test here.
-        const tx = await program.methods.initHouse(2000, name).rpc();
+        console.log("initHouse");
+        const accounts = {
+            admin: admin.publicKey,
+            auctionHouse: auction_house,
+            systemProgram: SystemProgram.programId
+        }
+
+        const tx = await program.methods.initHouse(1, "testAuction")
+            .accountsPartial({ ...accounts })
+            .signers([admin])
+            .rpc();
+
         console.log("Your transaction signature", tx);
     });
+
+    it("initialize auction", async () => {
+        end = new anchor.BN(await provider.connection.getSlot() + 20);
+
+    })
+    it("follow up", async () => {
+        console.log("end still = ", end);
+    })
 });

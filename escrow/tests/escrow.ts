@@ -1,20 +1,9 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Escrow } from "../target/types/escrow";
+import { LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js";
 import {
-  Keypair,
-  LAMPORTS_PER_SOL,
-  PublicKey,
-  SystemProgram,
-  Transaction,
-} from "@solana/web3.js";
-import {
-  MINT_SIZE,
   TOKEN_2022_PROGRAM_ID,
-  // TOKEN_PROGRAM_ID,
-  createAssociatedTokenAccountIdempotentInstruction,
-  createInitializeMint2Instruction,
-  createMintToInstruction,
   getAssociatedTokenAddressSync,
   getMinimumBalanceForRentExemptMint,
 } from "@solana/spl-token";
@@ -47,16 +36,17 @@ describe("escrow", () => {
   };
 
 
-  const seed = new BN(randomBytes(8));
+  const seed = new anchor.BN(randomBytes(8));
   const [maker, taker, mintA, mintB] = Array.from({ length: 4 }, () => Keypair.generate())
   const [makerAtaA, makerAtaB, takerAtaA, takerAtaB] = [maker, taker]
     .map((a) => [mintA, mintB].map((m) =>
-      getAssociatedTokenAddressSync(m.publicKey, a.publicKey, false, tokenProgram))).flat;
+      getAssociatedTokenAddressSync(m.publicKey, a.publicKey, false, tokenProgram))).flat(1);
 
   const escrow = PublicKey.findProgramAddressSync(
     [Buffer.from("escrow"), maker.publicKey.toBuffer(), seed.toArrayLike(Buffer, "le", 8)],
     program.programId
   )[0];
+
 
   const vault = getAssociatedTokenAddressSync(mintA.publicKey, escrow, true, tokenProgram);
 
@@ -74,10 +64,10 @@ describe("escrow", () => {
     tokenProgram,
   }
 
-
   it("Airdrop and create mints", async () => {
+    await provider.connection.requestAirdrop(maker.publicKey, 10 * LAMPORTS_PER_SOL);
     let lamports = await getMinimumBalanceForRentExemptMint(connection);
-    const tx = await program.methods.make().rpc();
+    const tx = await program.methods.make({ seed: 1, receive: 2, deposit: 3 }).accountsPartial(accounts).signers([maker]).rpc();
     console.log("Your transaction signature", tx);
   });
 });

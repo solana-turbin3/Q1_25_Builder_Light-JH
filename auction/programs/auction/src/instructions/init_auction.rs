@@ -7,7 +7,7 @@ use anchor_spl::{
 use crate::state::{Auction, AuctionHouse};
 
 #[derive(Accounts)]
-#[instruction(end: Slot)]
+#[instruction(starting_price: u64, end: Slot, amount: u64, decimal: u8)]
 pub struct InitAuction<'info> {
     #[account(mut)]
     pub seller: Signer<'info>,
