@@ -86,7 +86,13 @@ pub struct Finalize<'info> {
 
 // there is a winner
 impl<'info> Finalize<'info> {
-    pub fn winner_withdraw_and_close_vault(&mut self) -> Result<()> {
+    pub fn finalize(&mut self) -> Result<()> {
+        self.winner_withdraw_and_close_vault()?;
+        self.seller_withdraw_and_close_escrow()?;
+        Ok(())
+    }
+
+    fn winner_withdraw_and_close_vault(&mut self) -> Result<()> {
         let current_slot = Clock::get()?.slot;
         require!(
             (self.bid_state.bidder == self.auction.bidder && current_slot >= self.auction.end),
@@ -137,7 +143,7 @@ impl<'info> Finalize<'info> {
         Ok(())
     }
 
-    pub fn seller_withdraw_and_close_escrow(&mut self) -> Result<()> {
+    fn seller_withdraw_and_close_escrow(&mut self) -> Result<()> {
         let current_slot = Clock::get()?.slot;
         require!(
             (current_slot >= self.auction.end),
