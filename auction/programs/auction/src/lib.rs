@@ -32,9 +32,7 @@ pub mod auction {
     }
 
     pub fn bid(ctx: Context<Bid>, price: u64, decimal: u8) -> Result<()> {
-        ctx.accounts
-            .place_and_update_bid(price, decimal, &ctx.bumps)?;
-        ctx.accounts.deposit()?;
+        ctx.accounts.bid(price, decimal, &ctx.bumps)?;
         Ok(())
     }
 

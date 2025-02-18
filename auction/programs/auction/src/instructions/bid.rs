@@ -57,25 +57,32 @@ pub struct Bid<'info> {
 }
 
 impl<'info> Bid<'info> {
-    pub fn place_and_update_bid(&mut self, price: u64, decimal: u8, bump: &BidBumps) -> Result<()> {
+    pub fn bid(&mut self, price: u64, decimal: u8, bump: &BidBumps) -> Result<()> {
         require!(
             price > self.auction.highest_price,
             AuctionError::PriceTooLow
         );
+        self.update_auction(price, decimal);
+        self.create_bid_state(bump);
+        self.deposit_bid()?;
+        Ok(())
+    }
 
-        self.auction.highest_price = price;
+    fn update_auction(&mut self, price: u64, decimal: u8) {
         self.auction.bidder = self.bidder.key();
+        self.auction.highest_price = price;
         self.auction.decimal = decimal;
+    }
 
-        // create bid account to store the bid account
+    fn create_bid_state(&mut self, bump: &BidBumps) {
         self.bid_state.set_inner(BidState {
             bidder: self.bidder.key(),
             bump: bump.bid_state,
             auction: self.auction.key(),
         });
-        Ok(())
     }
-    pub fn deposit(&mut self) -> Result<()> {
+
+    fn deposit_bid(&mut self) -> Result<()> {
         let amount = self
             .vault
             .amount
