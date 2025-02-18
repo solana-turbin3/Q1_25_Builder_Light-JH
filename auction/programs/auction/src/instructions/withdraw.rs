@@ -13,7 +13,7 @@ pub struct Withdraw<'info> {
     pub bidder: Signer<'info>,
     pub mint_b: InterfaceAccount<'info, Mint>,
     #[account(
-        seeds = [b"house", auction_house.name.as_str().as_bytes()],
+        seeds = [b"house", auction_house.name.as_bytes()],
         bump = auction_house.bump,
     )]
     pub auction_house: Account<'info, AuctionHouse>,

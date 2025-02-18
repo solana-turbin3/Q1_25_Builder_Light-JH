@@ -20,7 +20,7 @@ pub struct Finalize<'info> {
     pub mint_b: InterfaceAccount<'info, Mint>,
     // pub mint_b: InterfaceAccount<'info, Mint>,// can get from auction.mint_b
     #[account(
-        seeds = [b"house", auction_house.name.as_str().as_bytes()],
+        seeds = [b"house", auction_house.name.as_bytes()],
         bump = auction_house.bump,
     )]
     pub auction_house: Account<'info, AuctionHouse>,

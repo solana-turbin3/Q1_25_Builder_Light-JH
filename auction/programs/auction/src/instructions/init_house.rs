@@ -14,7 +14,7 @@ pub struct InitHouse<'info> {
         space = 8 + AuctionHouse::INIT_SPACE,
         // convert the string slice (&str) into a byte array([&[u8]])
         // different accounts to be created under the same program but uniquelly identified by "name"
-        seeds = [b"house", name.as_str().as_bytes()],
+        seeds = [b"house", name.as_bytes()],
         bump,
     )]
     pub auction_house: Account<'info, AuctionHouse>,
@@ -24,7 +24,7 @@ pub struct InitHouse<'info> {
 impl<'info> InitHouse<'info> {
     pub fn init_house(&mut self, fee: u16, bumps: &InitHouseBumps, name: String) -> Result<()> {
         require!(
-            name.len() > 0 && name.len() < 32,
+            !name.is_empty() && name.len() < 32,
             AuctionError::NameTooLong
         );
 
