@@ -51,6 +51,7 @@ impl<'info> InitAuction<'info> {
         &mut self,
         starting_price: u64,
         end: Slot,
+        amount: u64,
         decimal: u8,
         bumps: &InitAuctionBumps,
     ) -> Result<()> {
@@ -64,11 +65,12 @@ impl<'info> InitAuction<'info> {
             decimal,
             bidder: Pubkey::default(),
         });
+        self.deposit(amount)?;
 
         Ok(())
     }
 
-    pub fn deposit(&mut self, amount: u64) -> Result<()> {
+    fn deposit(&mut self, amount: u64) -> Result<()> {
         let cpi_program = self.token_program.to_account_info();
         let transfer_accounts = TransferChecked {
             from: self.seller_mint_a_ata.to_account_info(),

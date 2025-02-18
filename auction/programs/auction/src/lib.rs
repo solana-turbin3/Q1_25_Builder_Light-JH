@@ -27,8 +27,7 @@ pub mod auction {
         decimal: u8,
     ) -> Result<()> {
         ctx.accounts
-            .init_auction(starting_price, end, decimal, &ctx.bumps)?;
-        ctx.accounts.deposit(amount)?;
+            .init_auction(starting_price, end, amount, decimal, &ctx.bumps)?;
         Ok(())
     }
 
