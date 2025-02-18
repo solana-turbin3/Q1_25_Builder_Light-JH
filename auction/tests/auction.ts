@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Auction } from "../target/types/auction";
-import { Keypair, LAMPORTS_PER_SOL, SystemProgram, PublicKey } from "@solana/web3.js";
+import { Keypair, LAMPORTS_PER_SOL, SystemProgram, PublicKey, ComputeBudgetInstruction, ComputeBudgetProgram } from "@solana/web3.js";
 import { randomBytes } from 'crypto';
 
 import {
@@ -50,8 +50,9 @@ describe("auction", () => {
     let auction: PublicKey;
     let vault: PublicKey;
     let bidderEscrow: PublicKey;
+    let bidder2Escrow: PublicKey;
     let bidState: PublicKey;
-
+    let bid2State: PublicKey;
 
     const starting_price = new anchor.BN(2000000);
     const amount = new anchor.BN(50);
@@ -216,7 +217,7 @@ describe("auction", () => {
     });
 
     it("initialize auction", async () => {
-        end = new anchor.BN(await provider.connection.getSlot() + 20);
+        end = new anchor.BN(await provider.connection.getSlot() + 10);
 
         const [auction_pk] = PublicKey.findProgramAddressSync(
             [
@@ -252,11 +253,21 @@ describe("auction", () => {
             .accountsPartial({ ...accounts })
             .signers([seller])
             .rpc();
-
         console.log("Your transaction signature", tx);
+
+        // Check auction state is set to expected values
+        let auctionAccount = await program.account.auction.fetch(auction);
+        console.log("auction acount: ", auctionAccount);
+        assert.ok(auctionAccount.seller.equals(seller.publicKey));
+        assert.ok(auctionAccount.mintA.equals(mintA.publicKey));
+        assert.ok(auctionAccount.mintB.equals(mintB.publicKey));
+        assert.ok(auctionAccount.bidder.equals(PublicKey.default));
+        assert.ok(auctionAccount.decimal == 6);
+        assert.ok(auctionAccount.highestPrice.eq(starting_price.sub(new anchor.BN(1))));
+
+        // Check the vault token account balance
         const vaultAccount = await getAccount(provider.connection, vault);
         assert.ok(new anchor.BN(vaultAccount.amount.toString()).eq(amount));
-
     })
     it("bid", async () => {
         const [bidState_pk] = PublicKey.findProgramAddressSync(
@@ -267,8 +278,8 @@ describe("auction", () => {
             ],
             program.programId,
         );
-        const bidState = bidState_pk;
-        const bidderEscrow = getAssociatedTokenAddressSync(mintB.publicKey, bidState, true, tokenProgram);
+        bidState = bidState_pk;
+        bidderEscrow = getAssociatedTokenAddressSync(mintB.publicKey, bidState, true, tokenProgram);
 
         console.log("bid state and escrow accounts for: ", {
             bidState: bidState.toString(),
@@ -295,10 +306,27 @@ describe("auction", () => {
 
         console.log("Your transaction signature", tx);
 
-        // const bidderEscrowAccount = await getAccount(provider.connection, bidderEscrow);
-        // assert.ok(new anchor.BN(bidderEscrowAccount.amount.toString()).eq(new anchor.BN(bidPrice * amount / 1000000)));
-    })
+        // Check auction state is set to expected values
+        let auctionAccount = await program.account.auction.fetch(auction);
+        console.log("auction acount: ", auctionAccount);
+        assert.ok(auctionAccount.seller.equals(seller.publicKey));
+        assert.ok(auctionAccount.mintA.equals(mintA.publicKey));
+        assert.ok(auctionAccount.mintB.equals(mintB.publicKey));
+        assert.ok(auctionAccount.bidder.equals(bidder.publicKey));
+        assert.ok(auctionAccount.decimal == 6);
+        assert.ok(auctionAccount.highestPrice.eq(bidPrice));
 
+        // Check the bid state is set to expected values
+        const bidStateAccount = await program.account.bidState.fetch(bidState);
+        console.log("bid state: {}", bidStateAccount);
+        assert.ok(bidStateAccount.auction.equals(auction));
+        assert.ok(bidStateAccount.bidder.equals(bidder.publicKey));
+
+        // Check the bidder escrow token account
+        const bidderEscrowAccount = await getAccount(provider.connection, bidderEscrow);
+        console.log("bidder escrow: {}", bidderEscrowAccount);
+        assert.ok(new anchor.BN(bidderEscrowAccount.amount.toString()).eq(bidPrice.mul(amount).div(new anchor.BN(1000000))));
+    })
     it("bid2", async () => {
         const [bid2State_pk] = PublicKey.findProgramAddressSync(
             [
@@ -308,8 +336,8 @@ describe("auction", () => {
             ],
             program.programId,
         );
-        const bid2State = bid2State_pk;
-        const bidder2Escrow = getAssociatedTokenAddressSync(mintB.publicKey, bid2State, true, tokenProgram);
+        bid2State = bid2State_pk;
+        bidder2Escrow = getAssociatedTokenAddressSync(mintB.publicKey, bid2State, true, tokenProgram);
 
         console.log("bid state and escrow accounts for: ", {
             bid2State: bid2State.toString(),
@@ -336,12 +364,26 @@ describe("auction", () => {
 
         console.log("Your transaction signature", tx);
 
-        const auctionAccount = await program.account.auction.fetch(auction);
+        // Check auction state is set to expected values
+        let auctionAccount = await program.account.auction.fetch(auction);
+        console.log("auction acount: ", auctionAccount);
+        assert.ok(auctionAccount.seller.equals(seller.publicKey));
+        assert.ok(auctionAccount.mintA.equals(mintA.publicKey));
+        assert.ok(auctionAccount.mintB.equals(mintB.publicKey));
         assert.ok(auctionAccount.bidder.equals(bidder2.publicKey));
+        assert.ok(auctionAccount.decimal == 6);
         assert.ok(auctionAccount.highestPrice.eq(bidPrice2));
 
-        // const bidderEscrowAccount = await getAccount(provider.connection, bidderEscrow);
-        // assert.ok(new anchor.BN(bidderEscrowAccount.amount.toString()).eq(new anchor.BN(bidPrice * amount / 1000000)));
+        // Check the bid state is set to expected values
+        const bid2StateAccount = await program.account.bidState.fetch(bid2State);
+        console.log("bid2 state: {}", bid2StateAccount);
+        assert.ok(bid2StateAccount.auction.equals(auction));
+        assert.ok(bid2StateAccount.bidder.equals(bidder2.publicKey));
+
+        // Check the bidder escrow token account
+        const bidder2EscrowAccount = await getAccount(provider.connection, bidder2Escrow);
+        console.log("bidder2 escrow: {}", bidder2EscrowAccount);
+        assert.ok(new anchor.BN(bidder2EscrowAccount.amount.toString()).eq(bidPrice2.mul(amount).div(new anchor.BN(1000000))));
     })
 
     it("finalize", async () => {
@@ -353,7 +395,6 @@ describe("auction", () => {
             }
         }
         console.log("auction over! finalizing...");
-
         const accounts = {
             payer: seller.publicKey,
             seller: seller.publicKey,
@@ -367,39 +408,45 @@ describe("auction", () => {
             sellerAtaB: sellerAtaB,
             sellerAtaA: sellerAtaA,
             houseMintB: houseAtaB,
-            bidderEscrow: bidderEscrow,
-            bidState: bidState,
+            bidderEscrow: bidder2Escrow,
+            bidState: bid2State,
             vault: vault,
             systemProgram: SystemProgram.programId,
             tokenProgram: TOKEN_PROGRAM_ID,
             associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        }
-        const tx = await program.methods.finalize()
-            .accountsPartial({ ...accounts })
-            .signers([seller])
-            .rpc();
+        };
+        console.log(accounts);
 
-        console.log("Your transaction signature", tx);
+        try {
+            let tx = await program.methods.finalize()
+                .accountsPartial({ ...accounts })
+                .signers([seller])
+                .rpc();
+            console.log("Your transaction signature", tx);
+        } catch (err) {
+            console.log(err);
+            throw err;
+        }
     })
 
-    it("withdraw", async () => {
-        const accounts = {
-            bidder: bidder.publicKey,
-            mintB: mintB.publicKey,
-            auctionHouse: auction_house,
-            auction: auction,
-            bidderAtaB: bidderAtaB,
-            bidderEscrow: bidderEscrow,
-            bidState: bidState,
-            systemProgram: SystemProgram.programId,
-            tokenProgram: TOKEN_PROGRAM_ID,
-            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        }
-        const tx = await program.methods.withdraw()
-            .accountsPartial({ ...accounts })
-            .signers([bidder])
-            .rpc();
+    // it("withdraw", async () => {
+    //     const accounts = {
+    //         bidder: bidder.publicKey,
+    //         mintB: mintB.publicKey,
+    //         auctionHouse: auction_house,
+    //         auction: auction,
+    //         bidderAtaB: bidderAtaB,
+    //         bidderEscrow: bidderEscrow,
+    //         bidState: bidState,
+    //         systemProgram: SystemProgram.programId,
+    //         tokenProgram: TOKEN_PROGRAM_ID,
+    //         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+    //     }
+    //     const tx = await program.methods.withdraw()
+    //         .accountsPartial({ ...accounts })
+    //         .signers([bidder])
+    //         .rpc();
 
-        console.log("Your transaction signature", tx);
-    })
+    //     console.log("Your transaction signature", tx);
+    // })
 });

@@ -18,17 +18,17 @@ pub struct Finalize<'info> {
     pub admin: SystemAccount<'info>,
     pub mint_a: InterfaceAccount<'info, Mint>,
     pub mint_b: InterfaceAccount<'info, Mint>,
-    // pub mint_b: InterfaceAccount<'info, Mint>,// can get from auction.mint_b
     #[account(
         seeds = [b"house", auction_house.name.as_bytes()],
         bump = auction_house.bump,
     )]
     pub auction_house: Account<'info, AuctionHouse>,
     #[account(
-        mut,
-        close = seller,
+        // mut,
+        // close = seller,
         seeds = [b"auction", auction_house.key().as_ref(), seller.key().as_ref(), mint_a.key().as_ref(), mint_b.key().as_ref(), auction.end.to_le_bytes().as_ref()],
         bump = auction.bump,
+        constraint = auction.bidder == bidder.key(),
     )]
     pub auction: Account<'info, Auction>,
     #[account(
@@ -67,10 +67,11 @@ pub struct Finalize<'info> {
     )]
     pub bidder_escrow: InterfaceAccount<'info, TokenAccount>,
     #[account(
-        mut,
-        close = bidder,
+        // mut,
+        // close = bidder,
         seeds = [b"bid", auction.key().as_ref(), bidder.key().as_ref()],
         bump = bid_state.bump,
+        constraint = bid_state.bidder == bidder.key(),
     )]
     pub bid_state: Account<'info, BidState>,
     #[account(
@@ -87,6 +88,8 @@ pub struct Finalize<'info> {
 // there is a winner
 impl<'info> Finalize<'info> {
     pub fn finalize(&mut self) -> Result<()> {
+        msg!("bid_state.bidder: {:?}", self.bid_state.bidder);
+        msg!("bidder.key(): {:?}", self.bidder.key());
         self.winner_withdraw_and_close_vault()?;
         self.seller_withdraw_and_close_escrow()?;
         Ok(())
@@ -95,7 +98,19 @@ impl<'info> Finalize<'info> {
     fn winner_withdraw_and_close_vault(&mut self) -> Result<()> {
         let current_slot = Clock::get()?.slot;
         require!(
-            (self.bid_state.bidder == self.auction.bidder && current_slot >= self.auction.end),
+            current_slot >= self.auction.end,
+            AuctionError::NotEligibleToWithdraw
+        );
+        require!(
+            self.bid_state.bidder == self.bidder.key(),
+            AuctionError::NotEligibleToWithdraw
+        );
+        require!(
+            self.auction.bidder == self.bidder.key(),
+            AuctionError::NotEligibleToWithdraw
+        );
+        require!(
+            self.bid_state.bidder == self.auction.bidder,
             AuctionError::NotEligibleToWithdraw
         );
 
