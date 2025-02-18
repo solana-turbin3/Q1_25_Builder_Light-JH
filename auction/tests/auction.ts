@@ -365,6 +365,7 @@ describe("auction", () => {
             auction: auction,
             bidderAtaA: bidder2AtaA,
             sellerAtaB: sellerAtaB,
+            sellerAtaA: sellerAtaA,
             houseMintB: houseAtaB,
             bidderEscrow: bidderEscrow,
             bidState: bidState,
