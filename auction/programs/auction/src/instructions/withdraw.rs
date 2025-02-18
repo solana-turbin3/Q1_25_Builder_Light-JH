@@ -20,23 +20,23 @@ pub struct Withdraw<'info> {
     /// CHECK: This is unchecked, because the account may or may not exist at this point.
     pub auction: AccountInfo<'info>,
     #[account(
+        init_if_needed,
+        payer = bidder,
         associated_token::mint = mint_b,
         associated_token::authority = bidder,
     )]
     pub bidder_mint_b_ata: InterfaceAccount<'info, TokenAccount>,
     #[account(
-        init,
-        payer = bidder,
+        mut,
         associated_token::mint = mint_b,
         associated_token::authority = bid_state,
     )]
     pub bidder_escrow: InterfaceAccount<'info, TokenAccount>,
     #[account(
-        init,
-        payer = bidder,
-        space = 8 + BidState::INIT_SPACE,
+        mut,
+        close = bidder,
         seeds = [b"bid", auction.key().as_ref(), bidder.key().as_ref()],
-        bump,
+        bump = bid_state.bump,
         constraint = bid_state.auction == auction.key()
     )]
     pub bid_state: Account<'info, BidState>,
@@ -47,16 +47,19 @@ pub struct Withdraw<'info> {
 
 impl<'info> Withdraw<'info> {
     pub fn withdraw(&mut self) -> Result<()> {
+        msg!("withdraw");
         // If the `auction` account does not exist (no data)
         // then no additional verification is necessary.
         // If the `auction` account does exist, it must be Auction,
         // and the withdrawing bidder must not be the highest bidder.
         if !self.auction.data_is_empty() {
+            msg!("auction still exists...");
             let auction = Auction::try_deserialize(&mut self.auction.data.borrow().as_ref())?;
             require!(
                 auction.bidder != self.bid_state.bidder,
                 AuctionError::NotEligibleToWithdraw
             );
+            msg!("and i'm not highest bidder");
         }
 
         let seeds = &[
@@ -78,6 +81,7 @@ impl<'info> Withdraw<'info> {
 
         let cpi_ctx = CpiContext::new_with_signer(cpi_program, transfer_accounts, signer_seeds);
 
+        msg!("transfering back to bidder");
         transfer_checked(cpi_ctx, self.bidder_escrow.amount, self.mint_b.decimals)?;
 
         Ok(())

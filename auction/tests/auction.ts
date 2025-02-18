@@ -53,21 +53,15 @@ describe("auction", () => {
     let bidState: PublicKey;
 
 
-    // const [bid_state] = PublicKey.findProgramAddressSync(
-    //     [
-    //         Buffer.from("bid"),
-    //         auction.toBuffer(),
-    //         bidder.publicKey.toBuffer(),
-    //     ],
-    //     program.programId,
-    // );
-
-    // const vault = getAssociatedTokenAddressSync(mintA.publicKey, auction, true, tokenProgram);
-    // const bidder_escrow = getAssociatedTokenAddressSync(mintB.publicKey, bid_state, true, tokenProgram);
-    // const seed = new anchor.BN(randomBytes(8));
     const starting_price = new anchor.BN(2000000);
     const amount = new anchor.BN(50);
     const bidPrice = new anchor.BN(3000000);
+    const bidPrice2 = new anchor.BN(4000000);
+
+    const bidder2 = Keypair.generate();
+    const bidder2AtaB = getAssociatedTokenAddressSync(mintB.publicKey, bidder2.publicKey, true, tokenProgram);
+    const bidder2AtaA = getAssociatedTokenAddressSync(mintA.publicKey, bidder2.publicKey, true, tokenProgram);
+
 
     before("airdrop", async () => {
         console.log("requesting airdrops");
@@ -84,6 +78,12 @@ describe("auction", () => {
                 SystemProgram.transfer({
                     fromPubkey: provider.publicKey,
                     toPubkey: bidder.publicKey,
+                    lamports: 0.2 * LAMPORTS_PER_SOL,
+
+                }),
+                SystemProgram.transfer({
+                    fromPubkey: provider.publicKey,
+                    toPubkey: bidder2.publicKey,
                     lamports: 0.2 * LAMPORTS_PER_SOL,
 
                 }),
@@ -113,6 +113,7 @@ describe("auction", () => {
             console.log("airdropping for: ", {
                 seller: seller.publicKey.toString(),
                 bidder: bidder.publicKey.toString(),
+                bidder2: bidder2.publicKey.toString(),
                 mintA: mintA.publicKey.toString(),
                 mintB: mintB.publicKey.toString(),
             });
@@ -135,6 +136,7 @@ describe("auction", () => {
             });
             await provider.sendAndConfirm(tx, [seller]);
         }
+        // bidderAtaB
         {
             let tx = new anchor.web3.Transaction();
             tx.instructions = [
@@ -154,12 +156,32 @@ describe("auction", () => {
             const bidderAtaBAccount = await getAccount(provider.connection, bidderAtaB);
             assert.ok(bidderAtaBAccount.amount == BigInt(1e9));
         }
+        // bidder2AtaB
+        {
+            let tx = new anchor.web3.Transaction();
+            tx.instructions = [
+                createAssociatedTokenAccountIdempotentInstruction(
+                    provider.publicKey, bidder2AtaB, bidder2.publicKey, mintB.publicKey, tokenProgram
+                ),
+                createMintToInstruction(mintB.publicKey, bidder2AtaB, bidder.publicKey, 1e9, undefined, tokenProgram),
+            ]
+            console.log("minting bidder2 ATA: ", {
+                bidder2: bidder2.publicKey.toString(),
+                mintB: mintB.publicKey.toString(),
+                bidder2AtaB: bidder2AtaB.toString()
+            });
+            await provider.sendAndConfirm(tx, [bidder]);
+
+            const bidder2AtaBAccount = await getAccount(provider.connection, bidder2AtaB);
+            assert.ok(bidder2AtaBAccount.amount == BigInt(1e9));
+        }
+
         const connection = program.provider.connection;
 
         const mintAInfo = await connection.getAccountInfo(mintA.publicKey);
         console.log("MintA Account Info:", mintAInfo);
 
-        const mintBInfo = await connection.getAccountInfo(mintA.publicKey);
+        const mintBInfo = await connection.getAccountInfo(mintB.publicKey);
         console.log("MintB Account Info:", mintAInfo);
 
         // Ensure the mints are initalized
@@ -277,6 +299,51 @@ describe("auction", () => {
         // assert.ok(new anchor.BN(bidderEscrowAccount.amount.toString()).eq(new anchor.BN(bidPrice * amount / 1000000)));
     })
 
+    it("bid2", async () => {
+        const [bid2State_pk] = PublicKey.findProgramAddressSync(
+            [
+                Buffer.from("bid"),
+                auction.toBuffer(),
+                bidder2.publicKey.toBuffer(),
+            ],
+            program.programId,
+        );
+        const bid2State = bid2State_pk;
+        const bidder2Escrow = getAssociatedTokenAddressSync(mintB.publicKey, bid2State, true, tokenProgram);
+
+        console.log("bid state and escrow accounts for: ", {
+            bid2State: bid2State.toString(),
+            bidder2Escrow: bidder2Escrow.toString(),
+        })
+
+        const accounts = {
+            bidder: bidder2.publicKey,
+            mintB: mintB.publicKey,
+            auctionHouse: auction_house,
+            auction: auction,
+            bidderAtaB: bidder2AtaB,
+            bidderEscrow: bidder2Escrow,
+            bidState: bid2State,
+            vault: vault,
+            systemProgram: SystemProgram.programId,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        }
+        const tx = await program.methods.bid(bidPrice2, 6)
+            .accountsPartial({ ...accounts })
+            .signers([bidder2])
+            .rpc();
+
+        console.log("Your transaction signature", tx);
+
+        const auctionAccount = await program.account.auction.fetch(auction);
+        assert.ok(auctionAccount.bidder.equals(bidder2.publicKey));
+        assert.ok(auctionAccount.highestPrice.eq(bidPrice2));
+
+        // const bidderEscrowAccount = await getAccount(provider.connection, bidderEscrow);
+        // assert.ok(new anchor.BN(bidderEscrowAccount.amount.toString()).eq(new anchor.BN(bidPrice * amount / 1000000)));
+    })
+
     it("finalize", async () => {
         console.log("waiting for auction to end...");
         while (true) {
@@ -290,13 +357,13 @@ describe("auction", () => {
         const accounts = {
             payer: seller.publicKey,
             seller: seller.publicKey,
-            bidder: bidder.publicKey,
+            bidder: bidder2.publicKey,
             admin: admin.publicKey,
             mintA: mintA.publicKey,
             mintB: mintB.publicKey,
             auctionHouse: auction_house,
             auction: auction,
-            bidderAtaA: bidderAtaA,
+            bidderAtaA: bidder2AtaA,
             sellerAtaB: sellerAtaB,
             houseMintB: houseAtaB,
             bidderEscrow: bidderEscrow,
@@ -314,25 +381,24 @@ describe("auction", () => {
         console.log("Your transaction signature", tx);
     })
 
-    // it("withdraw", async () => {
-    //     end = new anchor.BN(await provider.connection.getSlot() + 20);
-    //     const accounts = {
-    //         bidder: bidder.publicKey,
-    //         mintB: mintB.publicKey,
-    //         auctionHouse: auction_house,
-    //         auction: auction,
-    //         bidderAtaB: bidderAtaB,
-    //         bidderEscrow: bidder_escrow,
-    //         bidState: bid_state,
-    //         systemProgram: SystemProgram.programId,
-    //         tokenProgram: TOKEN_PROGRAM_ID,
-    //         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-    //     }
-    //     const tx = await program.methods.withdraw()
-    //         .accountsPartial({ ...accounts })
-    //         .signers([bidder])
-    //         .rpc();
+    it("withdraw", async () => {
+        const accounts = {
+            bidder: bidder.publicKey,
+            mintB: mintB.publicKey,
+            auctionHouse: auction_house,
+            auction: auction,
+            bidderAtaB: bidderAtaB,
+            bidderEscrow: bidderEscrow,
+            bidState: bidState,
+            systemProgram: SystemProgram.programId,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        }
+        const tx = await program.methods.withdraw()
+            .accountsPartial({ ...accounts })
+            .signers([bidder])
+            .rpc();
 
-    //     console.log("Your transaction signature", tx);
-    // })
+        console.log("Your transaction signature", tx);
+    })
 });
