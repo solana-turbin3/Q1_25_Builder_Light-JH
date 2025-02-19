@@ -408,12 +408,12 @@ describe("auction", () => {
             sellerAtaB: sellerAtaB,
             sellerAtaA: sellerAtaA,
             houseMintB: houseAtaB,
-            bidderEscrow: bidder2Escrow,
             bidState: bid2State,
+            bidderEscrow: bidder2Escrow,
             vault: vault,
-            systemProgram: SystemProgram.programId,
-            tokenProgram: TOKEN_PROGRAM_ID,
             associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            systemProgram: SystemProgram.programId,
         };
         console.log(accounts);
 
