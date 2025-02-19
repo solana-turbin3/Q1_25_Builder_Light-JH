@@ -24,7 +24,7 @@ pub struct Finalize<'info> {
         close = seller,
         // seeds = [b"auction", auction_house.key().as_ref(), seller.key().as_ref(), mint_a.key().as_ref(), mint_b.key().as_ref(), auction.end.to_le_bytes().as_ref()],
         // bump = auction.bump,
-        constraint = auction.bidder == bidder.key(),
+        constraint = auction.bidder == Some(bidder.key()),
     )]
     pub auction: Account<'info, Auction>,
     #[account(
@@ -57,8 +57,8 @@ pub struct Finalize<'info> {
     pub house_mint_b_ata: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        // mut,
-        // close = bidder,
+        mut,
+        close = bidder,
         seeds = [b"bid", auction.key().as_ref(), bidder.key().as_ref()],
         bump = bid_state.bump,
         constraint = bid_state.bidder == bidder.key(),
@@ -84,8 +84,9 @@ pub struct Finalize<'info> {
 // there is a winner
 impl<'info> Finalize<'info> {
     pub fn finalize(&mut self) -> Result<()> {
-        // msg!("bid_state.bidder: {:?}", self.bid_state.bidder);
-        // msg!("bidder.key(): {:?}", self.bidder.key());
+        msg!("bidder.key(): {:?}", self.bidder.key());
+        msg!("bid_state.bidder: {:?}", self.bid_state.bidder);
+        msg!("bid_state = {:?}", self.bid_state);
         self.winner_withdraw_and_close_vault()?;
         self.seller_withdraw_and_close_escrow()?;
         Ok(())
@@ -102,11 +103,11 @@ impl<'info> Finalize<'info> {
             AuctionError::NotEligibleToWithdraw
         );
         require!(
-            self.auction.bidder == self.bidder.key(),
+            self.auction.bidder == Some(self.bidder.key()),
             AuctionError::NotEligibleToWithdraw
         );
         require!(
-            self.bid_state.bidder == self.auction.bidder,
+            Some(self.bid_state.bidder) == self.auction.bidder,
             AuctionError::NotEligibleToWithdraw
         );
 
@@ -238,7 +239,7 @@ impl<'info> Finalize<'info> {
     pub fn cancel(&mut self) -> Result<()> {
         let current_slot = Clock::get()?.slot;
         require!(
-            (self.auction.bidder.key() == Pubkey::default() && current_slot >= self.auction.end),
+            (self.auction.bidder.is_none() && current_slot >= self.auction.end),
             AuctionError::NotEligibleToWithdraw
         );
 

@@ -1,17 +1,14 @@
-use anchor_lang::{prelude::*, solana_program::clock::Slot};
+use anchor_lang::prelude::*;
 
 #[account]
+#[derive(InitSpace)]
 pub struct Auction {
     pub seller: Pubkey,
     pub mint_a: Pubkey,
     pub mint_b: Pubkey,
     pub bump: u8,
-    pub end: Slot,
+    pub end: u64,
     pub highest_price: u64,
     pub decimal: u8,
-    pub bidder: Pubkey,
-}
-
-impl Space for Auction {
-    const INIT_SPACE: usize = 8 + 32 + 32 + 32 + 1 + 8 + 8 + 1 + 32;
+    pub bidder: Option<Pubkey>,
 }

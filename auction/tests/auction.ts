@@ -261,7 +261,7 @@ describe("auction", () => {
         assert.ok(auctionAccount.seller.equals(seller.publicKey));
         assert.ok(auctionAccount.mintA.equals(mintA.publicKey));
         assert.ok(auctionAccount.mintB.equals(mintB.publicKey));
-        assert.ok(auctionAccount.bidder.equals(PublicKey.default));
+        assert.ok(auctionAccount.bidder == null);
         assert.ok(auctionAccount.decimal == 6);
         assert.ok(auctionAccount.highestPrice.eq(starting_price.sub(new anchor.BN(1))));
 
@@ -421,6 +421,7 @@ describe("auction", () => {
             let tx = await program.methods.finalize()
                 .accountsPartial({ ...accounts })
                 .signers([seller])
+                .preInstructions([ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 })])
                 .rpc();
             console.log("Your transaction signature", tx);
         } catch (err) {

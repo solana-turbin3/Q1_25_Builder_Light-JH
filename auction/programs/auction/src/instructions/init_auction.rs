@@ -63,7 +63,7 @@ impl<'info> InitAuction<'info> {
             end,
             highest_price: starting_price.saturating_sub(1),
             decimal,
-            bidder: Pubkey::default(),
+            bidder: None,
         });
         self.deposit(amount)?;
 

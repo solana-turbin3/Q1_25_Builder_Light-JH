@@ -56,7 +56,7 @@ impl<'info> Withdraw<'info> {
             msg!("auction still exists...");
             let auction = Auction::try_deserialize(&mut self.auction.data.borrow().as_ref())?;
             require!(
-                auction.bidder != self.bid_state.bidder,
+                auction.bidder != Some(self.bid_state.bidder),
                 AuctionError::NotEligibleToWithdraw
             );
             msg!("and i'm not highest bidder");

@@ -69,7 +69,7 @@ impl<'info> Bid<'info> {
     }
 
     fn update_auction(&mut self, price: u64, decimal: u8) {
-        self.auction.bidder = self.bidder.key();
+        self.auction.bidder = Some(self.bidder.key());
         self.auction.highest_price = price;
         self.auction.decimal = decimal;
     }
