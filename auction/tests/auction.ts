@@ -430,24 +430,26 @@ describe("auction", () => {
         }
     })
 
-    // it("withdraw", async () => {
-    //     const accounts = {
-    //         bidder: bidder.publicKey,
-    //         mintB: mintB.publicKey,
-    //         auctionHouse: auction_house,
-    //         auction: auction,
-    //         bidderAtaB: bidderAtaB,
-    //         bidderEscrow: bidderEscrow,
-    //         bidState: bidState,
-    //         systemProgram: SystemProgram.programId,
-    //         tokenProgram: TOKEN_PROGRAM_ID,
-    //         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-    //     }
-    //     const tx = await program.methods.withdraw()
-    //         .accountsPartial({ ...accounts })
-    //         .signers([bidder])
-    //         .rpc();
+    it("withdraw", async () => {
+        const accounts = {
+            bidder: bidder.publicKey,
+            mintB: mintB.publicKey,
+            auctionHouse: auction_house,
+            auction: auction,
+            bidderAtaB: bidderAtaB,
+            bidderEscrow: bidderEscrow,
+            bidState: bidState,
+            systemProgram: SystemProgram.programId,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        }
+        const tx = await program.methods.withdraw()
+            .accountsPartial({ ...accounts })
+            .signers([bidder])
+            .rpc();
 
-    //     console.log("Your transaction signature", tx);
-    // })
+        const bidderAtaBAccount = await getAccount(provider.connection, bidderAtaB);
+        assert.ok(bidderAtaBAccount.amount === BigInt(1000000000));
+        console.log("Your transaction signature", tx);
+    })
 });

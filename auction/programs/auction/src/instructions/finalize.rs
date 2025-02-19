@@ -59,8 +59,8 @@ pub struct Finalize<'info> {
     #[account(
         mut,
         close = bidder,
-        seeds = [b"bid", auction.key().as_ref(), bidder.key().as_ref()],
-        bump = bid_state.bump,
+        // seeds = [b"bid", auction.key().as_ref(), bidder.key().as_ref()],
+        // bump = bid_state.bump,
         constraint = bid_state.bidder == bidder.key(),
     )]
     pub bid_state: Account<'info, BidState>,
