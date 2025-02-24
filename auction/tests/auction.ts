@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Auction } from "../target/types/auction";
 import { Keypair, LAMPORTS_PER_SOL, SystemProgram, PublicKey, ComputeBudgetInstruction, ComputeBudgetProgram } from "@solana/web3.js";
-import { randomBytes } from 'crypto';
+
 
 import {
     TOKEN_PROGRAM_ID,
@@ -21,7 +21,6 @@ import { assert } from "chai";
 
 describe("auction", () => {
 
-    // Configure the client to use the local cluster.
     let provider = anchor.getProvider();
     anchor.setProvider(anchor.AnchorProvider.env());
 

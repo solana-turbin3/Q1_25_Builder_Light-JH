@@ -8,7 +8,6 @@ use anchor_spl::{
 };
 
 #[derive(Accounts)]
-#[instruction(price: u64, decimal: u8 )]
 pub struct Bid<'info> {
     #[account(mut)]
     pub bidder: Signer<'info>,
