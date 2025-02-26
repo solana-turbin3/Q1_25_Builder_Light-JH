@@ -225,7 +225,6 @@ describe("auction", () => {
                 seller.publicKey.toBuffer(),
                 mintA.publicKey.toBuffer(),
                 mintB.publicKey.toBuffer(),
-                end.toArrayLike(Buffer, 'le', 8)
             ],
             program.programId,
         );
@@ -287,6 +286,7 @@ describe("auction", () => {
 
         const accounts = {
             bidder: bidder.publicKey,
+            mintA: mintA.publicKey,
             mintB: mintB.publicKey,
             auctionHouse: auction_house,
             auction: auction,
@@ -345,6 +345,7 @@ describe("auction", () => {
 
         const accounts = {
             bidder: bidder2.publicKey,
+            mintA: mintA.publicKey,
             mintB: mintB.publicKey,
             auctionHouse: auction_house,
             auction: auction,
@@ -609,7 +610,6 @@ describe("auction cancel", () => {
                 seller.publicKey.toBuffer(),
                 mintA.publicKey.toBuffer(),
                 mintB.publicKey.toBuffer(),
-                end.toArrayLike(Buffer, 'le', 8)
             ],
             program.programId,
         );

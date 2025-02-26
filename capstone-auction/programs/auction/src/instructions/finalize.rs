@@ -28,7 +28,7 @@ pub struct Finalize<'info> {
         close = seller,
         has_one = mint_a,
         has_one = mint_b,
-        // seeds = [b"auction", auction_house.key().as_ref(), seller.key().as_ref(), mint_a.key().as_ref(), mint_b.key().as_ref(), auction.end.to_le_bytes().as_ref()],
+        // seeds = [b"auction", auction_house.key().as_ref(), seller.key().as_ref(), mint_a.key().as_ref(), mint_b.key().as_ref()],
         // bump = auction.bump,
         constraint = auction.bidder == Some(bidder.key()),
     )]
@@ -123,7 +123,6 @@ impl<'info> Finalize<'info> {
             self.seller.to_account_info().key.as_ref(),
             self.mint_a.to_account_info().key.as_ref(),
             self.mint_b.to_account_info().key.as_ref(),
-            &self.auction.end.to_le_bytes()[..],
             &[self.auction.bump],
         ];
         let signer_seeds = &[&seeds[..]];
@@ -256,7 +255,6 @@ impl<'info> Finalize<'info> {
             self.seller.to_account_info().key.as_ref(),
             self.mint_a.to_account_info().key.as_ref(),
             self.mint_b.to_account_info().key.as_ref(),
-            &self.auction.end.to_le_bytes()[..],
             &[self.auction.bump],
         ];
         let signer_seeds = &[&seeds[..]];

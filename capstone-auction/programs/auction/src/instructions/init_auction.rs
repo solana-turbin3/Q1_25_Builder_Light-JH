@@ -7,7 +7,7 @@ use anchor_spl::{
 use crate::state::{Auction, AuctionHouse};
 
 #[derive(Accounts)]
-#[instruction(starting_price: u64, end: Slot, amount: u64, decimal: u8)]
+#[instruction(starting_price: u64,end: Slot, amount: u64, decimal: u8)]
 pub struct InitAuction<'info> {
     #[account(mut)]
     pub seller: Signer<'info>,
@@ -22,7 +22,7 @@ pub struct InitAuction<'info> {
         init,
         payer = seller,
         space = 8 + Auction::INIT_SPACE,
-        seeds = [b"auction", auction_house.key().as_ref(), seller.key().as_ref(), mint_a.key().as_ref(), mint_b.key().as_ref(), end.to_le_bytes().as_ref()],
+        seeds = [b"auction", auction_house.key().as_ref(), seller.key().as_ref(), mint_a.key().as_ref(), mint_b.key().as_ref()],
         bump,
     )]
     pub auction: Account<'info, Auction>,

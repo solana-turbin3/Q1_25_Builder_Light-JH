@@ -11,6 +11,7 @@ use anchor_spl::{
 pub struct Bid<'info> {
     #[account(mut)]
     pub bidder: Signer<'info>,
+    pub mint_a: InterfaceAccount<'info, Mint>,
     pub mint_b: InterfaceAccount<'info, Mint>,
     #[account(
         seeds = [b"house", auction_house.name.as_bytes()],
@@ -19,8 +20,8 @@ pub struct Bid<'info> {
     pub auction_house: Account<'info, AuctionHouse>,
     #[account(
         mut,
-        seeds = [b"auction", auction_house.key().as_ref(), auction.seller.key().as_ref(), auction.mint_a.key().as_ref(), mint_b.key().as_ref(), auction.end.to_le_bytes().as_ref()],
-        bump = auction.bump,
+        // seeds = [b"auction", auction_house.key().as_ref(), auction.seller.key().as_ref(),mint_a.key().as_ref(), mint_b.key().as_ref()],
+        // bump = auction.bump,
     )]
     pub auction: Account<'info, Auction>,
     #[account(
