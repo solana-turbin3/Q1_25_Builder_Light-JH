@@ -18,6 +18,10 @@ pub struct Finalize<'info> {
     pub admin: SystemAccount<'info>,
     pub mint_a: InterfaceAccount<'info, Mint>,
     pub mint_b: InterfaceAccount<'info, Mint>,
+    #[account(
+        seeds = [b"house", auction_house.name.as_bytes()],
+        bump = auction_house.bump,
+    )]
     pub auction_house: Account<'info, AuctionHouse>,
     #[account(
         mut,
@@ -61,8 +65,8 @@ pub struct Finalize<'info> {
     #[account(
         mut,
         close = bidder,
-        seeds = [b"bid", auction.key().as_ref(), bidder.key().as_ref()],
-        bump = bid_state.bump,
+        // seeds = [b"bid", auction.key().as_ref(), bidder.key().as_ref()],
+        // bump = bid_state.bump,
         constraint = bid_state.bidder == bidder.key(),
     )]
     pub bid_state: Account<'info, BidState>,
@@ -86,9 +90,9 @@ pub struct Finalize<'info> {
 // there is a winner
 impl<'info> Finalize<'info> {
     pub fn finalize(&mut self) -> Result<()> {
-        msg!("bidder.key(): {:?}", self.bidder.key());
-        msg!("bid_state.bidder: {:?}", self.bid_state.bidder);
-        msg!("bid_state = {:?}", self.bid_state);
+        // msg!("bidder.key(): {:?}", self.bidder.key());
+        // msg!("bid_state.bidder: {:?}", self.bid_state.bidder);
+        // msg!("bid_state = {:?}", self.bid_state);
         self.winner_withdraw_and_close_vault()?;
         self.seller_withdraw_and_close_escrow()?;
         Ok(())
