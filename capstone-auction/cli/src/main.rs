@@ -22,10 +22,12 @@ struct Cli {
     command: Command,
 
     /// Path to keypair file used for signing
+    /// #[clap(long, short)]
     #[arg(short, long, value_name = "PATH")]
     keypair_path: Option<PathBuf>,
 
     /// Name to identify the auction house.
+    /// #[clap(long, short)]
     #[arg(short, long, value_name = "NAME", default_value = "auction_house")]
     auction_house_name: String,
 }
@@ -35,6 +37,7 @@ enum Command {
     /// Initialize the AuctionHouse.
     InitHouse {
         /// Fee in basis points taken for successful auctions.
+        /// #[clap(long, short)]
         #[arg(value_name = "BASIS_POINTS")]
         fee: u16,
     },
