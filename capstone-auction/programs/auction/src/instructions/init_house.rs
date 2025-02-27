@@ -34,7 +34,6 @@ impl<'info> InitHouse<'info> {
             bump: bumps.auction_house,
             name,
         });
-
         Ok(())
     }
 }

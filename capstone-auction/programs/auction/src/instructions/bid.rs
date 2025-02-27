@@ -83,13 +83,14 @@ impl<'info> Bid<'info> {
     }
 
     fn deposit_bid(&mut self) -> Result<()> {
-        let amount = self
-            .vault
-            .amount
-            .checked_mul(self.auction.highest_price)
-            .ok_or(AuctionError::ArithematicOverflow)?
-            .checked_div(10u64.pow(u32::from(self.auction.decimal)))
-            .ok_or(AuctionError::ArithematicOverflow)?;
+        let amount = calculate_amount_b(
+            self.vault.amount,
+            self.auction.highest_price,
+            self.mint_a.decimals,
+            self.mint_b.decimals,
+            self.auction.decimal,
+        )
+        .ok_or(AuctionError::ArithematicOverflow)?;
 
         let cpi_program = self.token_program.to_account_info();
         //example bid_price = 2B/A, amount = 50, 2*50 = 100B
@@ -106,4 +107,31 @@ impl<'info> Bid<'info> {
 
         Ok(())
     }
+}
+
+fn calculate_amount_b(
+    amount_a: u64,
+    price: u64,
+    decimals_a: u8,
+    decimals_b: u8,
+    price_decimals: u8,
+) -> Option<u64> {
+    // Scale factors
+    let scale_a = 10u128.pow(decimals_a as u32);
+    let scale_b = 10u128.pow(decimals_b as u32);
+    let scale_price = 10u128.pow(price_decimals as u32);
+
+    // Convert to u128 to prevent overflow
+    let amount_a_128 = amount_a as u128;
+    let price_128 = price as u128;
+
+    // Compute: (amount_a * price * 10^decimals_b) / (10^(decimals_a + price_decimals))
+    let numerator = amount_a_128.checked_mul(price_128)?.checked_mul(scale_b)?;
+
+    let denominator = scale_a.checked_mul(scale_price)?;
+
+    let amount_b = numerator.checked_div(denominator)?;
+
+    // Convert back to u64 if safe
+    amount_b.try_into().ok()
 }
