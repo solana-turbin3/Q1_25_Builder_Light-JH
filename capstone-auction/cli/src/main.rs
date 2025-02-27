@@ -1,25 +1,33 @@
 use crate::idl::AuctionProgram;
 use clap::{Parser, Subcommand};
-use idl::InitHouseArgs;
+use decimal::decimal_to_u64;
+use idl::{BidArgs, InitAuctionArgs, InitHouseArgs};
 use solana_client::rpc_client::RpcClient;
+use solana_program::pubkey;
 use solana_sdk::{
+    program_pack::Pack,
     pubkey::Pubkey,
+    signature::Keypair,
     signer::{keypair::read_keypair_file, Signer},
+    sysvar::recent_blockhashes,
+    transaction,
 };
+use spl_token::state::Mint;
 use std::path::PathBuf;
 
+mod decimal;
 mod idl;
 
 #[derive(Parser)]
 #[command(name = "auction-cli")]
 #[command(about = " CLI for interacting with the Solana Aucton program")]
 struct Cli {
+    #[command(subcommand)]
+    command: Command,
+
     /// Path to keypair file used for signing
     #[arg(short, long, value_name = "PATH")]
     keypair_path: Option<PathBuf>,
-
-    #[command(subcommand)]
-    command: Command,
 
     /// Name to identify the auction house.
     #[arg(short, long, value_name = "NAME", default_value = "auction_house")]
@@ -37,6 +45,11 @@ enum Command {
 
     /// Initialize a new auction
     InitAuction {
+        /// Mint of the token being listed for auction.
+        listing_mint: Pubkey,
+        /// Mint of the token used for bidding in auction.
+        purchase_mint: Pubkey,
+
         /// The starting price.
         starting_price: String,
         /// The slot the auction will end on.
@@ -46,12 +59,22 @@ enum Command {
 
         /// The number of decimals to be used for the price.
         #[clap(long, short, default_value = "9")]
-        decimal: u8,
+        decimals: u8,
     },
 
+    /// bidder place bid
     Bid {
-        price: u64,
-        decimal: u8,
+        /// Mint of the token being listed for auction.
+        listing_mint: Pubkey,
+        /// Mint of the token used for bidding in auction.
+        purchase_mint: Pubkey,
+        /// The seller in the auction.
+        seller: Pubkey,
+        /// bidder bid price, requring price higher than the current highest price
+        price: String,
+        /// The number of decimals to be used for the price.
+        #[clap(long, short, default_value = "9")]
+        decimals: u8,
     },
 
     Withdraw,
@@ -91,10 +114,6 @@ fn main() {
             let recent_blockhash = client
                 .get_latest_blockhash()
                 .expect("recent blockhash exists");
-            let (auction_house, _auction_house_bump) = Pubkey::find_program_address(
-                &[b"house", auction_house_name.as_bytes()],
-                &AuctionProgram::id(),
-            );
             let transaction = AuctionProgram::init_house(
                 &[
                     &keypair.pubkey(),
@@ -119,18 +138,111 @@ fn main() {
         }
 
         Command::InitAuction {
+            listing_mint,
+            purchase_mint,
             starting_price,
             end_slot,
             amount,
-            decimal,
+            decimals,
         } => {
-            println!(
-                "Initializing auction with starting price: {}, end slot: {}, amount: {}, decimal: {}",
-                starting_price, end_slot, amount, decimal);
+            let seller = keypair.pubkey();
+            let AuctionSellerKeys {
+                auction,
+                vault,
+                seller_listing_mint_ata,
+                seller_purchase_mint_ata,
+            } = derive_auction_keys(&auction_house, &listing_mint, &purchase_mint, &seller);
+
+            let starting_price = decimal_to_u64(&starting_price, decimals).expect("invalid price");
+
+            let listing_mint_account = client
+                .get_account(&listing_mint)
+                .expect("could not get listing mint account");
+            let listing_mint_account =
+                Mint::unpack(&listing_mint_account.data).expect("invalid mint account data");
+            let listing_mint_decimals = listing_mint_account.decimals;
+            let amount = decimal_to_u64(&amount, listing_mint_decimals).expect("invalid amount");
+
+            let recent_blockhash = client
+                .get_latest_blockhash()
+                .expect("recent blockhash exists");
+            let transaction = AuctionProgram::init_auction(
+                &[
+                    &seller,
+                    &auction_house,
+                    &auction,
+                    &listing_mint,
+                    &purchase_mint,
+                    &seller_listing_mint_ata,
+                    &vault,
+                    &spl_associated_token_account::ID,
+                    &solana_sdk::system_program::ID,
+                    &spl_token::ID,
+                ],
+                &InitAuctionArgs {
+                    starting_price,
+                    end: end_slot,
+                    amount,
+                    decimal: decimals,
+                },
+                Some(&seller),
+                &[&keypair],
+                recent_blockhash,
+            );
+            let signature = client
+                .send_and_confirm_transaction(&transaction)
+                .expect("confirmed transaction");
+            println!("Initialized auction account: {} at {}", signature, auction)
         }
 
-        Command::Bid { price, decimal } => {
-            println!("Placing bid with price: {} (decimal={})", price, decimal)
+        Command::Bid {
+            listing_mint,
+            purchase_mint,
+            seller,
+            price,
+            decimals,
+        } => {
+            println!("Placing bid with price: {} (decimal={})", price, decimals);
+            let AuctionSellerKeys { auction, vault, .. } =
+                derive_auction_keys(&auction_house, &listing_mint, &purchase_mint, &seller);
+
+            let bidder = keypair.pubkey();
+            let BidderKeys {
+                bidder_purchase_mint_ata,
+                bid_state,
+                bid_escrow,
+                ..
+            } = derive_bidder_keys(&bidder, &purchase_mint, &listing_mint, &auction);
+
+            let recent_blockhash = client
+                .get_latest_blockhash()
+                .expect("recent blockhash exists");
+            let transaction = AuctionProgram::bid(
+                &[
+                    &bidder,
+                    &listing_mint,
+                    &purchase_mint,
+                    &auction_house,
+                    &auction,
+                    &bidder_purchase_mint_ata,
+                    &bid_state,
+                    &bid_escrow,
+                    &vault,
+                    &spl_associated_token_account::ID,
+                    &spl_token::ID,
+                    &solana_sdk::system_program::ID,
+                ],
+                &BidArgs {
+                    price: decimal_to_u64(&price, decimals).expect("invalid price"), // TODO: make sure decimals matches auction decimals.
+                },
+                Some(&bidder),
+                &[&keypair],
+                recent_blockhash,
+            );
+            let signature = client
+                .send_and_confirm_transaction(&transaction)
+                .expect("confirmed transaction");
+            println!("Placed bid and bid state: {} at {}", signature, bid_state)
         }
 
         Command::Withdraw => {
@@ -140,5 +252,74 @@ fn main() {
         Command::Finalize => {
             println!("Finalizing Auction")
         }
+    }
+}
+
+struct AuctionSellerKeys {
+    auction: Pubkey,
+    vault: Pubkey,
+    seller_listing_mint_ata: Pubkey,
+    seller_purchase_mint_ata: Pubkey,
+}
+
+fn derive_auction_keys(
+    auction_house: &Pubkey,
+    listing_mint: &Pubkey,
+    purchase_mint: &Pubkey,
+    seller: &Pubkey,
+) -> AuctionSellerKeys {
+    let (auction, _auction_bump) = Pubkey::find_program_address(
+        &[
+            b"auction",
+            auction_house.as_ref(),
+            seller.as_ref(),
+            listing_mint.as_ref(),
+            purchase_mint.as_ref(),
+        ],
+        &AuctionProgram::id(),
+    );
+    let vault = spl_associated_token_account::get_associated_token_address(&auction, listing_mint);
+    let seller_listing_mint_ata =
+        spl_associated_token_account::get_associated_token_address(seller, listing_mint);
+    let seller_purchase_mint_ata =
+        spl_associated_token_account::get_associated_token_address(seller, purchase_mint);
+
+    AuctionSellerKeys {
+        auction,
+        vault,
+        seller_listing_mint_ata,
+        seller_purchase_mint_ata,
+    }
+}
+
+struct BidderKeys {
+    bidder_purchase_mint_ata: Pubkey,
+    bidder_listing_mint_ata: Pubkey,
+    bid_state: Pubkey,
+    bid_escrow: Pubkey,
+}
+
+fn derive_bidder_keys(
+    bidder: &Pubkey,
+    purchase_mint: &Pubkey,
+    listing_mint: &Pubkey,
+    auction: &Pubkey,
+) -> BidderKeys {
+    let bidder_purchase_mint_ata =
+        spl_associated_token_account::get_associated_token_address(bidder, purchase_mint);
+    let bidder_listing_mint_ata =
+        spl_associated_token_account::get_associated_token_address(bidder, listing_mint);
+    let (bid_state, _bid_state_bump) = Pubkey::find_program_address(
+        &[b"bid", auction.as_ref(), bidder.as_ref()],
+        &AuctionProgram::id(),
+    );
+    let bid_escrow =
+        spl_associated_token_account::get_associated_token_address(&bid_state, purchase_mint);
+
+    BidderKeys {
+        bidder_purchase_mint_ata,
+        bidder_listing_mint_ata,
+        bid_state,
+        bid_escrow,
     }
 }

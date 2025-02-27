@@ -12,3 +12,5 @@ borsh = "0.10.3"
 solana-program = "1.18.11"
 solana-idlgen = { git = "https://github.com/deanmlittle/solana-idlgen.git" }
 dirs = "6.0.0"
+spl-associated-token-account = "3.0.4"
+spl-token = "3.5.0"

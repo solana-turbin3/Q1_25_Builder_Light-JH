@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Exit on errors
-set -e
+# set -e
 # solana-keygen new --no-bip39-passphrase -s -o xxx.json
 
 echo "Airdrop to default id..."

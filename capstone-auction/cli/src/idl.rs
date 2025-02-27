@@ -117,6 +117,11 @@ idlgen!({
           "isSigner": true
         },
         {
+          "name": "mint_a",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "mint_b",
           "isMut": false,
           "isSigner": false
@@ -171,10 +176,6 @@ idlgen!({
         {
           "name": "price",
           "type": "u64"
-        },
-        {
-          "name": "decimal",
-          "type": "u8"
         }
       ]
     },
