@@ -234,7 +234,10 @@ fn main() {
             let signature = client
                 .send_and_confirm_transaction(&transaction)
                 .expect("confirmed transaction");
-            println!("Initialized auction account: {} at {}", signature, auction)
+            println!(
+                "Initialized auction account: {}, auction:{}, vault: {}",
+                signature, auction, vault,
+            );
         }
 
         Command::Bid {
@@ -284,7 +287,7 @@ fn main() {
             let signature = client
                 .send_and_confirm_transaction(&transaction)
                 .expect("confirmed transaction");
-            println!("Placed bid and bid state: {} at {}", signature, bid_state)
+            println!("Placed bid and bid state: {} at {}", signature, bid_escrow)
         }
 
         Command::Withdraw {
@@ -330,7 +333,10 @@ fn main() {
             let signature = client
                 .send_and_confirm_transaction(&transaction)
                 .expect("confirmed transaction");
-            println!("Withdrawed bid:  {} at {}", signature, bid_escrow);
+            println!(
+                "Withdrawed bid:  {} from {} to {}",
+                signature, bid_escrow, bidder_purchase_mint_ata
+            );
         }
 
         Command::Finalize {
@@ -391,7 +397,8 @@ fn main() {
             let signature = client
                 .send_and_confirm_transaction(&transaction)
                 .expect("confirmed transaction");
-            println!("Withdrawed bid: {}", signature);
+            println!("finalize bid {}, auctioneer token account {}, bidder token {}, auction house fee {} ",
+            signature, seller_purchase_mint_ata, bidder_listing_mint_ata, house_purchase_mint_ata);
         }
 
         Command::Cancel {
@@ -433,7 +440,10 @@ fn main() {
                 .send_and_confirm_transaction(&transaction)
                 .expect("confirmed transaction");
 
-            println!("Canceled Auction {} at {}", auction, signature);
+            println!(
+                "Canceled Auction {} at {}",
+                signature, seller_listing_mint_ata
+            );
         }
     }
 }
