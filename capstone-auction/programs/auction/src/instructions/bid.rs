@@ -57,21 +57,20 @@ pub struct Bid<'info> {
 }
 
 impl<'info> Bid<'info> {
-    pub fn bid(&mut self, price: u64, decimal: u8, bump: &BidBumps) -> Result<()> {
+    pub fn bid(&mut self, price: u64, bump: &BidBumps) -> Result<()> {
         require!(
             price > self.auction.highest_price,
             AuctionError::PriceTooLow
         );
-        self.update_auction(price, decimal);
+        self.update_auction(price);
         self.create_bid_state(bump);
         self.deposit_bid()?;
         Ok(())
     }
 
-    fn update_auction(&mut self, price: u64, decimal: u8) {
+    fn update_auction(&mut self, price: u64) {
         self.auction.bidder = Some(self.bidder.key());
         self.auction.highest_price = price;
-        self.auction.decimal = decimal;
     }
 
     fn create_bid_state(&mut self, bump: &BidBumps) {

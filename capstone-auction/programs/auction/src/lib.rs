@@ -31,8 +31,8 @@ pub mod auction {
         Ok(())
     }
 
-    pub fn bid(ctx: Context<Bid>, price: u64, decimal: u8) -> Result<()> {
-        ctx.accounts.bid(price, decimal, &ctx.bumps)?;
+    pub fn bid(ctx: Context<Bid>, price: u64) -> Result<()> {
+        ctx.accounts.bid(price, &ctx.bumps)?;
         Ok(())
     }
 

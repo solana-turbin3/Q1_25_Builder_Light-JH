@@ -298,7 +298,7 @@ describe("auction", () => {
             tokenProgram: TOKEN_PROGRAM_ID,
             associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         }
-        const tx = await program.methods.bid(bidPrice, 6)
+        const tx = await program.methods.bid(bidPrice)
             .accountsPartial({ ...accounts })
             .signers([bidder])
             .rpc();
@@ -357,7 +357,7 @@ describe("auction", () => {
             tokenProgram: TOKEN_PROGRAM_ID,
             associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         }
-        const tx = await program.methods.bid(bidPrice2, 6)
+        const tx = await program.methods.bid(bidPrice2)
             .accountsPartial({ ...accounts })
             .signers([bidder2])
             .rpc();
