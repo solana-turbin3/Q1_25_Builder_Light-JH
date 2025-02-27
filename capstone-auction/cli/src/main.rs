@@ -3,14 +3,10 @@ use clap::{Parser, Subcommand};
 use decimal::decimal_to_u64;
 use idl::{BidArgs, InitAuctionArgs, InitHouseArgs};
 use solana_client::rpc_client::RpcClient;
-use solana_program::pubkey;
 use solana_sdk::{
     program_pack::Pack,
     pubkey::Pubkey,
-    signature::Keypair,
     signer::{keypair::read_keypair_file, Signer},
-    sysvar::recent_blockhashes,
-    transaction,
 };
 use spl_token::state::Mint;
 use std::path::PathBuf;
@@ -76,9 +72,34 @@ enum Command {
         #[clap(long, short, default_value = "9")]
         decimals: u8,
     },
-
-    Withdraw,
-    Finalize,
+    /// bidder withdraw after falling out of highest price
+    Withdraw {
+        /// Mint of the token being listed for auction.
+        // #[clap(long, short)]
+        listing_mint: Pubkey,
+        /// Mint of the token used for bidding in auction.
+        purchase_mint: Pubkey,
+        /// The seller in the auction.
+        seller: Pubkey,
+    },
+    Finalize {
+        /// auction house admin
+        admin: Pubkey,
+        /// Mint of the token being listed for auction.
+        listing_mint: Pubkey,
+        /// Mint of the token used for bidding in auction.
+        purchase_mint: Pubkey,
+        /// The seller in the auction.
+        seller: Pubkey,
+        /// The winner(bidder) in the auction.
+        bidder: Pubkey,
+    },
+    Cancel {
+        /// Mint of the token being listed for auction.
+        listing_mint: Pubkey,
+        /// Mint of the token used for bidding in auction.
+        purchase_mint: Pubkey,
+    },
 }
 
 fn main() {
@@ -150,7 +171,7 @@ fn main() {
                 auction,
                 vault,
                 seller_listing_mint_ata,
-                seller_purchase_mint_ata,
+                ..
             } = derive_auction_keys(&auction_house, &listing_mint, &purchase_mint, &seller);
 
             let starting_price = decimal_to_u64(&starting_price, decimals).expect("invalid price");
@@ -245,12 +266,153 @@ fn main() {
             println!("Placed bid and bid state: {} at {}", signature, bid_state)
         }
 
-        Command::Withdraw => {
-            println!("Withdraw funds")
+        Command::Withdraw {
+            purchase_mint,
+            listing_mint,
+            seller,
+        } => {
+            let AuctionSellerKeys { auction, .. } =
+                derive_auction_keys(&auction_house, &listing_mint, &purchase_mint, &seller);
+
+            let bidder = keypair.pubkey();
+            let BidderKeys {
+                bidder_purchase_mint_ata,
+                bid_state,
+                bid_escrow,
+                ..
+            } = derive_bidder_keys(&bidder, &purchase_mint, &listing_mint, &auction);
+            println!("bid_purchase_mint_ata={bidder_purchase_mint_ata}");
+            println!("bid_state={bid_state}");
+            println!("bid_escrow={bid_escrow}");
+
+            let recent_blockhash = client
+                .get_latest_blockhash()
+                .expect("recent blockhash exists");
+
+            let transaction = AuctionProgram::withdraw(
+                &[
+                    &bidder,
+                    &purchase_mint,
+                    &auction_house,
+                    &auction,
+                    &bidder_purchase_mint_ata,
+                    &bid_escrow,
+                    &bid_state,
+                    &spl_associated_token_account::ID,
+                    &spl_token::ID,
+                    &solana_sdk::system_program::ID,
+                ],
+                Some(&bidder),
+                &[&keypair],
+                recent_blockhash,
+            );
+            let signature = client
+                .send_and_confirm_transaction(&transaction)
+                .expect("confirmed transaction");
+            println!("Withdrawed bid:  {} at {}", signature, bid_escrow);
         }
 
-        Command::Finalize => {
-            println!("Finalizing Auction")
+        Command::Finalize {
+            admin,
+            listing_mint,
+            purchase_mint,
+            seller,
+            bidder,
+        } => {
+            println!("Finalizing and close auction");
+            let AuctionSellerKeys {
+                auction,
+                vault,
+                seller_listing_mint_ata,
+                seller_purchase_mint_ata,
+            } = derive_auction_keys(&auction_house, &listing_mint, &purchase_mint, &seller);
+
+            let BidderKeys {
+                bidder_listing_mint_ata,
+                bid_state,
+                bid_escrow,
+                ..
+            } = derive_bidder_keys(&bidder, &purchase_mint, &listing_mint, &auction);
+
+            let house_purchase_mint_ata =
+                spl_associated_token_account::get_associated_token_address(&admin, &purchase_mint);
+
+            let recent_blockhash = client
+                .get_latest_blockhash()
+                .expect("recent blockhash exists");
+
+            let transaction = AuctionProgram::finalize(
+                &[
+                    &keypair.pubkey(),
+                    &seller,
+                    &bidder,
+                    &admin,
+                    &listing_mint,
+                    &purchase_mint,
+                    &auction_house,
+                    &auction,
+                    &bidder_listing_mint_ata,
+                    &seller_purchase_mint_ata,
+                    &seller_listing_mint_ata,
+                    &house_purchase_mint_ata,
+                    &bid_state,
+                    &bid_escrow,
+                    &vault,
+                    &spl_associated_token_account::ID,
+                    &spl_token::ID,
+                    &solana_sdk::system_program::ID,
+                ],
+                Some(&keypair.pubkey()),
+                &[&keypair],
+                recent_blockhash,
+            );
+
+            let signature = client
+                .send_and_confirm_transaction(&transaction)
+                .expect("confirmed transaction");
+            println!("Withdrawed bid: {}", signature);
+        }
+
+        Command::Cancel {
+            listing_mint,
+            purchase_mint,
+        } => {
+            println!("Auctioneer withdraw and cancel auction due to unsuccessful auction");
+            let seller = keypair.pubkey();
+            let AuctionSellerKeys {
+                auction,
+                vault,
+                seller_listing_mint_ata,
+                ..
+            } = derive_auction_keys(&auction_house, &listing_mint, &purchase_mint, &seller);
+
+            let recent_blockhash = client
+                .get_latest_blockhash()
+                .expect("recent blockhash exists");
+
+            let transaction = AuctionProgram::cancel(
+                &[
+                    &seller,
+                    &auction_house,
+                    &auction,
+                    &listing_mint,
+                    &purchase_mint,
+                    &seller_listing_mint_ata,
+                    &vault,
+                    &spl_associated_token_account::ID,
+                    &solana_sdk::system_program::ID,
+                    &spl_token::ID,
+                ],
+                Some(&seller),
+                &[&keypair],
+                recent_blockhash,
+            );
+
+            let signature = client
+                .send_and_confirm_transaction(&transaction)
+                .expect("confirmed transaction");
+
+            println!("Canceled Auction {} at {}", auction, signature);
         }
     }
 }
