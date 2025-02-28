@@ -633,6 +633,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "auction-cli"
+version = "0.1.0"
+dependencies = [
+ "borsh 0.10.4",
+ "bs58 0.4.0",
+ "clap 4.5.31",
+ "dirs",
+ "solana-client",
+ "solana-idlgen",
+ "solana-program",
+ "solana-sdk",
+ "spl-associated-token-account 3.0.4",
+ "spl-token 3.5.0",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1092,22 +1108,6 @@ name = "clap_lex"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
-
-[[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "borsh 0.10.4",
- "bs58 0.4.0",
- "clap 4.5.31",
- "dirs",
- "solana-client",
- "solana-idlgen",
- "solana-program",
- "solana-sdk",
- "spl-associated-token-account 3.0.4",
- "spl-token 3.5.0",
-]
 
 [[package]]
 name = "colorchoice"

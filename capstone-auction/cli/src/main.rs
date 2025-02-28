@@ -136,7 +136,8 @@ fn main() {
         &AuctionProgram::id(),
     );
 
-    let rpc_url = "http://127.0.0.1:8899";
+    // let rpc_url = "http://127.0.0.1:8899";
+    let rpc_url = "https://api.devnet.solana.com";
     let client = RpcClient::new(rpc_url);
 
     let keypair_path = keypair_path.unwrap_or_else(|| {
