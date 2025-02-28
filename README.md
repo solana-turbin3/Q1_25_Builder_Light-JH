@@ -1,4 +1,4 @@
-# Capstone project - Auction
+# Capstone project - On-chain Auction
 ## Overview
 A blockchain-based auction that leverages smart contracts for price discovery and efficient resource allocation.
 ## Use case
