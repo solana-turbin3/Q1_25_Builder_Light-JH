@@ -22,10 +22,12 @@ struct Cli {
     command: Command,
 
     /// Path to keypair file used for signing
+    /// #[clap(long, short)]
     #[arg(short, long, value_name = "PATH")]
     keypair_path: Option<PathBuf>,
 
     /// Name to identify the auction house.
+    /// #[clap(long, short)]
     #[arg(short, long, value_name = "NAME", default_value = "auction_house")]
     auction_house_name: String,
 }
@@ -35,6 +37,7 @@ enum Command {
     /// Initialize the AuctionHouse.
     InitHouse {
         /// Fee in basis points taken for successful auctions.
+        /// #[clap(long, short)]
         #[arg(value_name = "BASIS_POINTS")]
         fee: u16,
     },
@@ -42,18 +45,24 @@ enum Command {
     /// Initialize a new auction
     InitAuction {
         /// Mint of the token being listed for auction.
+        /// #[clap(long, short)]
         listing_mint: Pubkey,
         /// Mint of the token used for bidding in auction.
+        /// #[clap(long, short)]
         purchase_mint: Pubkey,
 
         /// The starting price.
+        /// #[clap(long, short)]
         starting_price: String,
         /// The slot the auction will end on.
+        /// #[clap(long, short)]
         end_slot: u64,
         /// The number of tokens to auction off.
+        /// #[clap(long, short)]
         amount: String,
 
         /// The number of decimals to be used for the price.
+        /// #[clap(long, short)]
         #[clap(long, short, default_value = "9")]
         decimals: u8,
     },
@@ -61,14 +70,19 @@ enum Command {
     /// bidder place bid
     Bid {
         /// Mint of the token being listed for auction.
+        /// #[clap(long, short)]
         listing_mint: Pubkey,
         /// Mint of the token used for bidding in auction.
+        /// #[clap(long, short)]
         purchase_mint: Pubkey,
         /// The seller in the auction.
+        /// #[clap(long, short)]
         seller: Pubkey,
         /// bidder bid price, requring price higher than the current highest price
+        /// #[clap(long, short)]
         price: String,
         /// The number of decimals to be used for the price.
+        /// #[clap(long, short)]
         #[clap(long, short, default_value = "9")]
         decimals: u8,
     },
@@ -84,20 +98,27 @@ enum Command {
     },
     Finalize {
         /// auction house admin
+        /// #[clap(long, short)]
         admin: Pubkey,
         /// Mint of the token being listed for auction.
+        /// #[clap(long, short)]
         listing_mint: Pubkey,
         /// Mint of the token used for bidding in auction.
+        /// #[clap(long, short)]
         purchase_mint: Pubkey,
         /// The seller in the auction.
+        /// #[clap(long, short)]
         seller: Pubkey,
         /// The winner(bidder) in the auction.
+        /// #[clap(long, short)]
         bidder: Pubkey,
     },
     Cancel {
         /// Mint of the token being listed for auction.
+        /// #[clap(long, short)]
         listing_mint: Pubkey,
         /// Mint of the token used for bidding in auction.
+        /// #[clap(long, short)]
         purchase_mint: Pubkey,
     },
 }
@@ -115,7 +136,8 @@ fn main() {
         &AuctionProgram::id(),
     );
 
-    let rpc_url = "http://127.0.0.1:8899";
+    // let rpc_url = "http://127.0.0.1:8899";
+    let rpc_url = "https://api.devnet.solana.com";
     let client = RpcClient::new(rpc_url);
 
     let keypair_path = keypair_path.unwrap_or_else(|| {
@@ -213,7 +235,10 @@ fn main() {
             let signature = client
                 .send_and_confirm_transaction(&transaction)
                 .expect("confirmed transaction");
-            println!("Initialized auction account: {} at {}", signature, auction)
+            println!(
+                "Initialized auction account: {}, auction:{}, vault: {}",
+                signature, auction, vault,
+            );
         }
 
         Command::Bid {
@@ -263,7 +288,7 @@ fn main() {
             let signature = client
                 .send_and_confirm_transaction(&transaction)
                 .expect("confirmed transaction");
-            println!("Placed bid and bid state: {} at {}", signature, bid_state)
+            println!("Placed bid and bid state: {} at {}", signature, bid_escrow)
         }
 
         Command::Withdraw {
@@ -309,7 +334,10 @@ fn main() {
             let signature = client
                 .send_and_confirm_transaction(&transaction)
                 .expect("confirmed transaction");
-            println!("Withdrawed bid:  {} at {}", signature, bid_escrow);
+            println!(
+                "Withdrawed bid:  {} from {} to {}",
+                signature, bid_escrow, bidder_purchase_mint_ata
+            );
         }
 
         Command::Finalize {
@@ -370,7 +398,8 @@ fn main() {
             let signature = client
                 .send_and_confirm_transaction(&transaction)
                 .expect("confirmed transaction");
-            println!("Withdrawed bid: {}", signature);
+            println!("finalize bid {}, auctioneer token account {}, bidder token {}, auction house fee {} ",
+            signature, seller_purchase_mint_ata, bidder_listing_mint_ata, house_purchase_mint_ata);
         }
 
         Command::Cancel {
@@ -412,7 +441,10 @@ fn main() {
                 .send_and_confirm_transaction(&transaction)
                 .expect("confirmed transaction");
 
-            println!("Canceled Auction {} at {}", auction, signature);
+            println!(
+                "Canceled Auction {} at {}",
+                signature, seller_listing_mint_ata
+            );
         }
     }
 }
