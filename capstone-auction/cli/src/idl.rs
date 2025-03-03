@@ -2,7 +2,7 @@ use solana_idlgen::idlgen;
 idlgen!({
   "name": "auction",
   "version": "0.1.0",
-  "metadata":{"address": "7VNBDULA3eH3ctDqx5ckpfZA1Xe2AkjUnGjuXe7de6bf"},
+  "metadata":{"address": "6k28s3kLLzHwdDbuw6BVKSxK6oH1FUJQiWPeoFomnGrF"},
   "instructions": [
     {
       "name": "init_house",
@@ -223,27 +223,6 @@ idlgen!({
           "isSigner": false
         },
         {
-          "name": "bidder_mint_a_ata",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "seller_mint_b_ata",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "seller_mint_a_ata",
-          "isMut": true,
-          "isSigner": false
-
-          },
-        {
-          "name": "house_mint_b_ata",
-          "isMut": true,
-          "isSigner": false
-          },
-        {
           "name": "bid_state",
           "isMut": true,
           "isSigner": false
@@ -255,6 +234,21 @@ idlgen!({
         },
         {
           "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "bidder_mint_a_ata",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "seller_mint_b_ata",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin_mint_b_ata",
           "isMut": true,
           "isSigner": false
         },

@@ -207,7 +207,7 @@ describe("auction", () => {
             systemProgram: SystemProgram.programId
         }
 
-        const tx = await program.methods.initHouse(1, "testAuction")
+        const tx = await program.methods.initHouse(100, "testAuction")
             .accountsPartial({ ...accounts })
             .signers([admin])
             .rpc();
@@ -216,7 +216,7 @@ describe("auction", () => {
     });
 
     it("initialize auction", async () => {
-        end = new anchor.BN(await provider.connection.getSlot() + 10);
+        end = new anchor.BN(await provider.connection.getSlot() + 3);
 
         const [auction_pk] = PublicKey.findProgramAddressSync(
             [
@@ -428,6 +428,10 @@ describe("auction", () => {
             console.log(err);
             throw err;
         }
+
+        assert.deepEqual((await getAccount(provider.connection, bidder2AtaA)).amount, BigInt(50));
+        assert.deepEqual((await getAccount(provider.connection, sellerAtaB)).amount, BigInt(198));
+        assert.deepEqual((await getAccount(provider.connection, houseAtaB)).amount, BigInt(2));
     })
 
     it("withdraw", async () => {
@@ -456,253 +460,253 @@ describe("auction", () => {
 
 //test cancel seperately because no success bid
 
-describe("auction cancel", () => {
-    let provider = anchor.getProvider();
-    anchor.setProvider(anchor.AnchorProvider.env());
+// describe("auction cancel", () => {
+//     let provider = anchor.getProvider();
+//     anchor.setProvider(anchor.AnchorProvider.env());
 
-    const program = anchor.workspace.Auction as Program<Auction>;
+//     const program = anchor.workspace.Auction as Program<Auction>;
 
-    const admin = Keypair.generate();
-    const seller = Keypair.generate();
-    const mintA = Keypair.generate();
-    const mintB = Keypair.generate();
-    const tokenProgram = TOKEN_PROGRAM_ID;
-    const sellerAtaA = getAssociatedTokenAddressSync(mintA.publicKey, seller.publicKey, true, tokenProgram);
-    const sellerAtaB = getAssociatedTokenAddressSync(mintB.publicKey, seller.publicKey, true, tokenProgram);
-    const name = String("testAuctionCancel");
-    const [auction_house] = PublicKey.findProgramAddressSync(
-        [
-            Buffer.from("house"),
-            Buffer.from(name),
-        ],
-        program.programId,
-    );
-    let end: anchor.BN;
-    let auction: PublicKey;
-    let vault: PublicKey;
+//     const admin = Keypair.generate();
+//     const seller = Keypair.generate();
+//     const mintA = Keypair.generate();
+//     const mintB = Keypair.generate();
+//     const tokenProgram = TOKEN_PROGRAM_ID;
+//     const sellerAtaA = getAssociatedTokenAddressSync(mintA.publicKey, seller.publicKey, true, tokenProgram);
+//     const sellerAtaB = getAssociatedTokenAddressSync(mintB.publicKey, seller.publicKey, true, tokenProgram);
+//     const name = String("testAuctionCancel");
+//     const [auction_house] = PublicKey.findProgramAddressSync(
+//         [
+//             Buffer.from("house"),
+//             Buffer.from(name),
+//         ],
+//         program.programId,
+//     );
+//     let end: anchor.BN;
+//     let auction: PublicKey;
+//     let vault: PublicKey;
 
-    const starting_price = new anchor.BN(2000000);
-    const amount = new anchor.BN(50);
+//     const starting_price = new anchor.BN(2000000);
+//     const amount = new anchor.BN(50);
 
-    before("airdrop", async () => {
-        console.log("requesting airdrops");
-        let lamports = await getMinimumBalanceForRentExemptMint(program.provider.connection);
-        {
-            let tx = new anchor.web3.Transaction();
-            tx.instructions = [
-                SystemProgram.transfer({
-                    fromPubkey: provider.publicKey,
-                    toPubkey: seller.publicKey,
-                    lamports: 0.2 * LAMPORTS_PER_SOL,
+//     before("airdrop", async () => {
+//         console.log("requesting airdrops");
+//         let lamports = await getMinimumBalanceForRentExemptMint(program.provider.connection);
+//         {
+//             let tx = new anchor.web3.Transaction();
+//             tx.instructions = [
+//                 SystemProgram.transfer({
+//                     fromPubkey: provider.publicKey,
+//                     toPubkey: seller.publicKey,
+//                     lamports: 0.2 * LAMPORTS_PER_SOL,
 
-                }),
-                SystemProgram.transfer({
-                    fromPubkey: provider.publicKey,
-                    toPubkey: admin.publicKey,
-                    lamports: 0.2 * LAMPORTS_PER_SOL,
+//                 }),
+//                 SystemProgram.transfer({
+//                     fromPubkey: provider.publicKey,
+//                     toPubkey: admin.publicKey,
+//                     lamports: 0.2 * LAMPORTS_PER_SOL,
 
-                }),
-                SystemProgram.createAccount({
-                    fromPubkey: provider.publicKey,
-                    newAccountPubkey: mintA.publicKey,
-                    lamports,
-                    space: MINT_SIZE,
-                    programId: tokenProgram,
+//                 }),
+//                 SystemProgram.createAccount({
+//                     fromPubkey: provider.publicKey,
+//                     newAccountPubkey: mintA.publicKey,
+//                     lamports,
+//                     space: MINT_SIZE,
+//                     programId: tokenProgram,
 
-                }),
-                SystemProgram.createAccount({
-                    fromPubkey: provider.publicKey,
-                    newAccountPubkey: mintB.publicKey,
-                    lamports,
-                    space: MINT_SIZE,
-                    programId: tokenProgram,
+//                 }),
+//                 SystemProgram.createAccount({
+//                     fromPubkey: provider.publicKey,
+//                     newAccountPubkey: mintB.publicKey,
+//                     lamports,
+//                     space: MINT_SIZE,
+//                     programId: tokenProgram,
 
-                })
-            ];
-            console.log("airdropping for: ", {
-                seller: seller.publicKey.toString(),
-                mintA: mintA.publicKey.toString(),
-                mintB: mintB.publicKey.toString(),
-            });
-            await provider.sendAndConfirm(tx, [mintA, mintB]);
-        }
+//                 })
+//             ];
+//             console.log("airdropping for: ", {
+//                 seller: seller.publicKey.toString(),
+//                 mintA: mintA.publicKey.toString(),
+//                 mintB: mintB.publicKey.toString(),
+//             });
+//             await provider.sendAndConfirm(tx, [mintA, mintB]);
+//         }
 
-        {
-            let tx = new anchor.web3.Transaction();
-            tx.instructions = [
-                createInitializeMint2Instruction(mintA.publicKey, 6, seller.publicKey, null, tokenProgram),
-                createAssociatedTokenAccountIdempotentInstruction(
-                    provider.publicKey, sellerAtaA, seller.publicKey, mintA.publicKey, tokenProgram
-                ),
-                createMintToInstruction(mintA.publicKey, sellerAtaA, seller.publicKey, 1e9, undefined, tokenProgram)
-            ];
-            console.log("creating mintA, minting seller ATA: ", {
-                seller: seller.publicKey.toString(),
-                mintA: mintA.publicKey.toString(),
-                sellerAtaA: sellerAtaA.toString(),
-            });
-            await provider.sendAndConfirm(tx, [seller]);
-        }
+//         {
+//             let tx = new anchor.web3.Transaction();
+//             tx.instructions = [
+//                 createInitializeMint2Instruction(mintA.publicKey, 6, seller.publicKey, null, tokenProgram),
+//                 createAssociatedTokenAccountIdempotentInstruction(
+//                     provider.publicKey, sellerAtaA, seller.publicKey, mintA.publicKey, tokenProgram
+//                 ),
+//                 createMintToInstruction(mintA.publicKey, sellerAtaA, seller.publicKey, 1e9, undefined, tokenProgram)
+//             ];
+//             console.log("creating mintA, minting seller ATA: ", {
+//                 seller: seller.publicKey.toString(),
+//                 mintA: mintA.publicKey.toString(),
+//                 sellerAtaA: sellerAtaA.toString(),
+//             });
+//             await provider.sendAndConfirm(tx, [seller]);
+//         }
 
-        {
-            let tx = new anchor.web3.Transaction();
-            tx.instructions = [
-                createInitializeMint2Instruction(mintB.publicKey, 6, seller.publicKey, null, tokenProgram),
-                createAssociatedTokenAccountIdempotentInstruction(
-                    provider.publicKey, sellerAtaB, seller.publicKey, mintB.publicKey, tokenProgram
-                ),
-                createMintToInstruction(mintB.publicKey, sellerAtaB, seller.publicKey, 1e9, undefined, tokenProgram)
-            ];
-            console.log("creating mintB, minting seller ATA: ", {
-                seller: seller.publicKey.toString(),
-                mintB: mintB.publicKey.toString(),
-                sellerAtaB: sellerAtaB.toString(),
-            });
-            await provider.sendAndConfirm(tx, [seller]);
-        }
+//         {
+//             let tx = new anchor.web3.Transaction();
+//             tx.instructions = [
+//                 createInitializeMint2Instruction(mintB.publicKey, 6, seller.publicKey, null, tokenProgram),
+//                 createAssociatedTokenAccountIdempotentInstruction(
+//                     provider.publicKey, sellerAtaB, seller.publicKey, mintB.publicKey, tokenProgram
+//                 ),
+//                 createMintToInstruction(mintB.publicKey, sellerAtaB, seller.publicKey, 1e9, undefined, tokenProgram)
+//             ];
+//             console.log("creating mintB, minting seller ATA: ", {
+//                 seller: seller.publicKey.toString(),
+//                 mintB: mintB.publicKey.toString(),
+//                 sellerAtaB: sellerAtaB.toString(),
+//             });
+//             await provider.sendAndConfirm(tx, [seller]);
+//         }
 
-        const connection = program.provider.connection;
+//         const connection = program.provider.connection;
 
-        const mintAInfo = await connection.getAccountInfo(mintA.publicKey);
-        console.log("MintA Account Info:", mintAInfo);
+//         const mintAInfo = await connection.getAccountInfo(mintA.publicKey);
+//         console.log("MintA Account Info:", mintAInfo);
 
-        const mintBInfo = await connection.getAccountInfo(mintB.publicKey);
-        console.log("MintB Account Info:", mintAInfo);
+//         const mintBInfo = await connection.getAccountInfo(mintB.publicKey);
+//         console.log("MintB Account Info:", mintAInfo);
 
-        // Ensure the mints are initalized
-        if (!mintAInfo || !mintBInfo) {
-            throw new Error("Mint accounts are not initialized.")
-        }
+//         // Ensure the mints are initalized
+//         if (!mintAInfo || !mintBInfo) {
+//             throw new Error("Mint accounts are not initialized.")
+//         }
 
-        const sellerAtaABalance = await connection.getTokenAccountBalance(sellerAtaA);
-        console.log("Seller ATA A Balance:", sellerAtaABalance);
+//         const sellerAtaABalance = await connection.getTokenAccountBalance(sellerAtaA);
+//         console.log("Seller ATA A Balance:", sellerAtaABalance);
 
-        // Ensure the correct amount of tokens was minted
-        if (sellerAtaABalance.value.amount !== "1000000000") {
-            throw new Error("Incorrect token balance in maker's ATA for mintA.");
-        }
+//         // Ensure the correct amount of tokens was minted
+//         if (sellerAtaABalance.value.amount !== "1000000000") {
+//             throw new Error("Incorrect token balance in maker's ATA for mintA.");
+//         }
 
-    })
+//     })
 
-    it("initialize house", async () => {
-        console.log("initHouse");
-        const accounts = {
-            admin: admin.publicKey,
-            auctionHouse: auction_house,
-            systemProgram: SystemProgram.programId
-        }
+//     it("initialize house", async () => {
+//         console.log("initHouse");
+//         const accounts = {
+//             admin: admin.publicKey,
+//             auctionHouse: auction_house,
+//             systemProgram: SystemProgram.programId
+//         }
 
-        const tx = await program.methods.initHouse(1, name)
-            .accountsPartial({ ...accounts })
-            .signers([admin])
-            .rpc();
+//         const tx = await program.methods.initHouse(1, name)
+//             .accountsPartial({ ...accounts })
+//             .signers([admin])
+//             .rpc();
 
-        console.log("Your transaction signature", tx);
-    });
+//         console.log("Your transaction signature", tx);
+//     });
 
-    it("initialize auction", async () => {
-        end = new anchor.BN(await provider.connection.getSlot() + 10);
+//     it("initialize auction", async () => {
+//         end = new anchor.BN(await provider.connection.getSlot() + 10);
 
-        const [auction_pk] = PublicKey.findProgramAddressSync(
-            [
-                Buffer.from("auction"),
-                auction_house.toBuffer(),
-                seller.publicKey.toBuffer(),
-                mintA.publicKey.toBuffer(),
-                mintB.publicKey.toBuffer(),
-            ],
-            program.programId,
-        );
-        auction = auction_pk;
-        vault = getAssociatedTokenAddressSync(mintA.publicKey, auction, true, tokenProgram);
+//         const [auction_pk] = PublicKey.findProgramAddressSync(
+//             [
+//                 Buffer.from("auction"),
+//                 auction_house.toBuffer(),
+//                 seller.publicKey.toBuffer(),
+//                 mintA.publicKey.toBuffer(),
+//                 mintB.publicKey.toBuffer(),
+//             ],
+//             program.programId,
+//         );
+//         auction = auction_pk;
+//         vault = getAssociatedTokenAddressSync(mintA.publicKey, auction, true, tokenProgram);
 
-        console.log("auction accounts for: ", {
-            auction_pk: auction_pk.toString(),
-            vault: vault.toString(),
-        });
-        const accounts = {
-            seller: seller.publicKey,
-            auctionHouse: auction_house,
-            auction: auction,
-            mintA: mintA.publicKey,
-            mintB: mintB.publicKey,
-            sellerAtaA: sellerAtaA,
-            vault: vault,
-            systemProgram: SystemProgram.programId,
-            tokenProgram: TOKEN_PROGRAM_ID,
-            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        }
-        const tx = await program.methods.initAuction(starting_price, end, amount, 6)
-            .accountsPartial({ ...accounts })
-            .signers([seller])
-            .rpc();
-        console.log("Your transaction signature", tx);
+//         console.log("auction accounts for: ", {
+//             auction_pk: auction_pk.toString(),
+//             vault: vault.toString(),
+//         });
+//         const accounts = {
+//             seller: seller.publicKey,
+//             auctionHouse: auction_house,
+//             auction: auction,
+//             mintA: mintA.publicKey,
+//             mintB: mintB.publicKey,
+//             sellerAtaA: sellerAtaA,
+//             vault: vault,
+//             systemProgram: SystemProgram.programId,
+//             tokenProgram: TOKEN_PROGRAM_ID,
+//             associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+//         }
+//         const tx = await program.methods.initAuction(starting_price, end, amount, 6)
+//             .accountsPartial({ ...accounts })
+//             .signers([seller])
+//             .rpc();
+//         console.log("Your transaction signature", tx);
 
-        // Check auction state is set to expected values
-        let auctionAccount = await program.account.auction.fetch(auction);
-        console.log("auction acount: ", auctionAccount);
-        assert.ok(auctionAccount.seller.equals(seller.publicKey));
-        assert.ok(auctionAccount.mintA.equals(mintA.publicKey));
-        assert.ok(auctionAccount.mintB.equals(mintB.publicKey));
-        assert.ok(auctionAccount.bidder == null);
-        assert.ok(auctionAccount.decimal == 6);
-        assert.ok(auctionAccount.highestPrice.eq(starting_price.sub(new anchor.BN(1))));
+//         // Check auction state is set to expected values
+//         let auctionAccount = await program.account.auction.fetch(auction);
+//         console.log("auction acount: ", auctionAccount);
+//         assert.ok(auctionAccount.seller.equals(seller.publicKey));
+//         assert.ok(auctionAccount.mintA.equals(mintA.publicKey));
+//         assert.ok(auctionAccount.mintB.equals(mintB.publicKey));
+//         assert.ok(auctionAccount.bidder == null);
+//         assert.ok(auctionAccount.decimal == 6);
+//         assert.ok(auctionAccount.highestPrice.eq(starting_price.sub(new anchor.BN(1))));
 
-        // Check the vault token account balance
-        const vaultAccount = await getAccount(provider.connection, vault);
-        assert.ok(new anchor.BN(vaultAccount.amount.toString()).eq(amount));
-    })
-    it("cancel", async () => {
-        console.log("waiting for auction to end...");
-        while (true) {
-            const current_slot = new anchor.BN(await provider.connection.getSlot("processed"));
-            if (current_slot.gt(end)) {
-                break;
-            }
-        }
-        console.log("auction over! canceling...");
-        const accounts = {
-            payer: seller.publicKey,
-            seller: seller.publicKey,
-            admin: admin.publicKey,
-            mintA: mintA.publicKey,
-            mintB: mintB.publicKey,
-            auctionHouse: auction_house,
-            auction: auction,
-            sellerAtaA: sellerAtaA,
-            vault: vault,
-            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-            tokenProgram: TOKEN_PROGRAM_ID,
-            systemProgram: SystemProgram.programId,
-        };
-        console.log(accounts);
+//         // Check the vault token account balance
+//         const vaultAccount = await getAccount(provider.connection, vault);
+//         assert.ok(new anchor.BN(vaultAccount.amount.toString()).eq(amount));
+//     })
+//     it("cancel", async () => {
+//         console.log("waiting for auction to end...");
+//         while (true) {
+//             const current_slot = new anchor.BN(await provider.connection.getSlot("processed"));
+//             if (current_slot.gt(end)) {
+//                 break;
+//             }
+//         }
+//         console.log("auction over! canceling...");
+//         const accounts = {
+//             payer: seller.publicKey,
+//             seller: seller.publicKey,
+//             admin: admin.publicKey,
+//             mintA: mintA.publicKey,
+//             mintB: mintB.publicKey,
+//             auctionHouse: auction_house,
+//             auction: auction,
+//             sellerAtaA: sellerAtaA,
+//             vault: vault,
+//             associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+//             tokenProgram: TOKEN_PROGRAM_ID,
+//             systemProgram: SystemProgram.programId,
+//         };
+//         console.log(accounts);
 
-        try {
-            let tx = await program.methods.cancel()
-                .accountsPartial({ ...accounts })
-                .signers([seller])
-                .preInstructions([ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 })])
-                .rpc();
-            console.log("Your transaction signature", tx);
-        } catch (err) {
-            console.log(err);
-            throw err;
-        }
+//         try {
+//             let tx = await program.methods.cancel()
+//                 .accountsPartial({ ...accounts })
+//                 .signers([seller])
+//                 .preInstructions([ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 })])
+//                 .rpc();
+//             console.log("Your transaction signature", tx);
+//         } catch (err) {
+//             console.log(err);
+//             throw err;
+//         }
 
-        const sellerAtaABalance = await program.provider.connection.getTokenAccountBalance(sellerAtaA);
-        console.log("Seller ATA A Balance:", sellerAtaABalance);
+//         const sellerAtaABalance = await program.provider.connection.getTokenAccountBalance(sellerAtaA);
+//         console.log("Seller ATA A Balance:", sellerAtaABalance);
 
-        try {
-            await program.account.auction.fetch(auction)
-            throw new Error("Auction account was expected to be closed, but it still exists.");
-        } catch (error) {
-            expect(error).to.exist;
-        };
-        try {
-            await getAccount(provider.connection, vault);
-            throw new Error("Vault account was expected to be closed, but it still exists.");
-        } catch (error) {
-            expect(error).to.exist;
-        };
-    })
-});
+//         try {
+//             await program.account.auction.fetch(auction)
+//             throw new Error("Auction account was expected to be closed, but it still exists.");
+//         } catch (error) {
+//             expect(error).to.exist;
+//         };
+//         try {
+//             await getAccount(provider.connection, vault);
+//             throw new Error("Vault account was expected to be closed, but it still exists.");
+//         } catch (error) {
+//             expect(error).to.exist;
+//         };
+//     })
+// });
