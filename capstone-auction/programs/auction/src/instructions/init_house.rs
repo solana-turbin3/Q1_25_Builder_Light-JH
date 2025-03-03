@@ -12,12 +12,10 @@ pub struct InitHouse<'info> {
         init,
         payer = admin,
         space = 8 + AuctionHouse::INIT_SPACE,
-        // convert the string slice (&str) into a byte array([&[u8]])
-        // different accounts to be created under the same program but uniquelly identified by "name"
         seeds = [b"house", name.as_bytes()],
         bump,
     )]
-    pub auction_house: Account<'info, AuctionHouse>,
+    pub auction_house: Box<Account<'info, AuctionHouse>>,
     pub system_program: Program<'info, System>,
 }
 

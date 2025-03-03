@@ -11,25 +11,25 @@ use anchor_spl::{
 pub struct Bid<'info> {
     #[account(mut)]
     pub bidder: Signer<'info>,
-    pub mint_a: InterfaceAccount<'info, Mint>,
-    pub mint_b: InterfaceAccount<'info, Mint>,
+    pub mint_a: Box<InterfaceAccount<'info, Mint>>,
+    pub mint_b: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         seeds = [b"house", auction_house.name.as_bytes()],
         bump = auction_house.bump,
     )]
-    pub auction_house: Account<'info, AuctionHouse>,
+    pub auction_house: Box<Account<'info, AuctionHouse>>,
     #[account(
         mut,
-        // seeds = [b"auction", auction_house.key().as_ref(), auction.seller.key().as_ref(),mint_a.key().as_ref(), mint_b.key().as_ref()],
-        // bump = auction.bump,
+        seeds = [b"auction", auction_house.key().as_ref(), auction.seller.key().as_ref(),mint_a.key().as_ref(), mint_b.key().as_ref()],
+        bump = auction.bump,
     )]
-    pub auction: Account<'info, Auction>,
+    pub auction: Box<Account<'info, Auction>>,
     #[account(
         mut,
         associated_token::mint = mint_b,
         associated_token::authority = bidder,
     )]
-    pub bidder_mint_b_ata: InterfaceAccount<'info, TokenAccount>,
+    pub bidder_mint_b_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         init,
         payer = bidder,
@@ -37,20 +37,20 @@ pub struct Bid<'info> {
         seeds = [b"bid", auction.key().as_ref(), bidder.key().as_ref()],
         bump,
     )]
-    pub bid_state: Account<'info, BidState>,
+    pub bid_state: Box<Account<'info, BidState>>,
     #[account(
         init,
         payer = bidder,
         associated_token::mint = mint_b,
         associated_token::authority = bid_state,
     )]
-    pub bidder_escrow: InterfaceAccount<'info, TokenAccount>,
+    pub bidder_escrow: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         associated_token::mint = auction.mint_a,
         associated_token::authority = auction,
     )]
-    pub vault: InterfaceAccount<'info, TokenAccount>,
+    pub vault: Box<InterfaceAccount<'info, TokenAccount>>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,

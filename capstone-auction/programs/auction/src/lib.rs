@@ -7,7 +7,7 @@ mod state;
 // use errors::*;
 use instructions::*;
 
-declare_id!("7VNBDULA3eH3ctDqx5ckpfZA1Xe2AkjUnGjuXe7de6bf");
+declare_id!("6k28s3kLLzHwdDbuw6BVKSxK6oH1FUJQiWPeoFomnGrF");
 
 #[program]
 pub mod auction {
@@ -42,6 +42,7 @@ pub mod auction {
     }
 
     pub fn finalize(ctx: Context<Finalize>) -> Result<()> {
+        msg!("finalize");
         ctx.accounts.finalize()?;
         Ok(())
     }
